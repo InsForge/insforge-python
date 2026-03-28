@@ -30,7 +30,7 @@ class AppMetadata(BaseModel):
 class DatabaseMetadataTable(BaseModel):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-    name: str
+    name: str = Field(alias="tableName")
     record_count: int = Field(alias="recordCount")
 
 
@@ -38,10 +38,8 @@ class DatabaseMetadata(BaseModel):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
     tables: list[DatabaseMetadataTable] = Field(default_factory=list)
-    total_tables: int = Field(alias="totalTables")
-    total_records: int = Field(alias="totalRecords")
-    database_size: str = Field(alias="databaseSize")
-    last_updated: datetime = Field(alias="lastUpdated")
+    total_size_in_gb: float | None = Field(default=None, alias="totalSizeInGB")
+    hint: str | None = None
 
 
 class ApiKeyMetadata(BaseModel):

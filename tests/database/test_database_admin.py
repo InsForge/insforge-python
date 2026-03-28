@@ -51,14 +51,14 @@ def test_get_table_schema_returns_typed_model_from_schema_endpoint() -> None:
             return httpx.Response(
                 200,
                 json={
-                    "table_name": "posts",
+                    "tableName": "posts",
                     "columns": [
                         {
-                            "name": "id",
+                            "columnName": "id",
                             "type": "uuid",
-                            "nullable": False,
-                            "unique": True,
-                            "default": "gen_random_uuid()",
+                            "isNullable": False,
+                            "isUnique": True,
+                            "defaultValue": "gen_random_uuid()",
                             "isPrimaryKey": True,
                             "foreignKey": None,
                         }
@@ -95,7 +95,7 @@ def test_get_table_schema_quotes_table_name_path_segment() -> None:
             captured["method"] = method
             captured["url"] = str(url)
             captured["kwargs"] = kwargs
-            return httpx.Response(200, json={"table_name": "analytics/events", "columns": []})
+            return httpx.Response(200, json={"tableName": "analytics/events", "columns": []})
 
         async with InsforgeClient(
             base_url="https://example.com",

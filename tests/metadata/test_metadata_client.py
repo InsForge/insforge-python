@@ -64,13 +64,10 @@ def test_get_database_metadata_uses_explicit_access_token() -> None:
                 200,
                 json={
                     "tables": [
-                        {"name": "posts", "recordCount": 42},
-                        {"name": "comments", "recordCount": 57},
+                        {"tableName": "posts", "recordCount": 42},
+                        {"tableName": "comments", "recordCount": 57},
                     ],
-                    "totalTables": 2,
-                    "totalRecords": 99,
-                    "databaseSize": "128 MB",
-                    "lastUpdated": "2026-03-28T00:00:00Z",
+                    "totalSizeInGB": 0.128,
                 },
             )
 
@@ -89,7 +86,7 @@ def test_get_database_metadata_uses_explicit_access_token() -> None:
     assert captured["kwargs"]["headers"]["X-API-Key"] == "ins_test"
     assert captured["kwargs"]["headers"]["Authorization"] == "Bearer admin_token"
     assert isinstance(result, DatabaseMetadata)
-    assert result.total_records == 99
+    assert result.total_size_in_gb == 0.128
     assert result.tables[0].name == "posts"
 
 

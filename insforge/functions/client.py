@@ -86,7 +86,8 @@ class FunctionsClient:
             "/api/functions",
             access_token=access_token,
         )
-        return [FunctionMetadata.model_validate(item) for item in payload]
+        items = payload.get("functions", []) if isinstance(payload, dict) else payload
+        return [FunctionMetadata.model_validate(item) for item in items]
 
     async def get_function(
         self,

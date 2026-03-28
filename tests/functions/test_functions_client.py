@@ -138,18 +138,20 @@ def test_list_functions_uses_api_path_and_returns_typed_models() -> None:
             captured["kwargs"] = kwargs
             return httpx.Response(
                 200,
-                json=[
-                    {
-                        "id": "123e4567-e89b-12d3-a456-426614174000",
-                        "slug": "hello-world",
-                        "name": "Hello World Function",
-                        "description": "Returns a greeting message",
-                        "status": "active",
-                        "created_at": "2024-01-21T10:30:00Z",
-                        "updated_at": "2024-01-21T10:35:00Z",
-                        "deployed_at": "2024-01-21T10:35:00Z",
-                    }
-                ],
+                json={
+                    "functions": [
+                        {
+                            "id": "123e4567-e89b-12d3-a456-426614174000",
+                            "slug": "hello-world",
+                            "name": "Hello World Function",
+                            "description": "Returns a greeting message",
+                            "status": "active",
+                            "createdAt": "2024-01-21T10:30:00Z",
+                            "updatedAt": "2024-01-21T10:35:00Z",
+                            "deployedAt": "2024-01-21T10:35:00Z",
+                        }
+                    ],
+                },
             )
 
         async with InsforgeClient(

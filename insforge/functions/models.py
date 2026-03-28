@@ -11,16 +11,16 @@ from pydantic import model_validator
 
 
 class FunctionMetadata(BaseModel):
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
     id: str
     slug: str
     name: str
     description: str | None = None
     status: Literal["draft", "active", "error"]
-    created_at: datetime
-    updated_at: datetime
-    deployed_at: datetime | None = None
+    created_at: datetime = Field(alias="createdAt")
+    updated_at: datetime = Field(alias="updatedAt")
+    deployed_at: datetime | None = Field(default=None, alias="deployedAt")
 
 
 class FunctionDetails(FunctionMetadata):

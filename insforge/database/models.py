@@ -15,19 +15,21 @@ class DatabaseQueryResponse(BaseModel):
 class DatabaseTableForeignKey(BaseModel):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-    table: str
-    column: str
-    on_delete: str = Field(alias="on_delete")
+    constraint_name: str | None = Field(default=None, alias="constraint_name")
+    reference_table: str = Field(alias="referenceTable")
+    reference_column: str = Field(alias="referenceColumn")
+    on_delete: str = Field(default="NO ACTION", alias="onDelete")
+    on_update: str | None = Field(default=None, alias="onUpdate")
 
 
 class DatabaseTableColumn(BaseModel):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-    name: str
+    name: str = Field(alias="columnName")
     type: str
-    nullable: bool
-    unique: bool
-    default: str | None = None
+    nullable: bool = Field(alias="isNullable")
+    unique: bool = Field(alias="isUnique")
+    default_value: str | None = Field(default=None, alias="defaultValue")
     is_primary_key: bool = Field(alias="isPrimaryKey")
     foreign_key: DatabaseTableForeignKey | None = Field(default=None, alias="foreignKey")
 
@@ -35,8 +37,9 @@ class DatabaseTableColumn(BaseModel):
 class DatabaseTableSchemaResponse(BaseModel):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-    table_name: str
+    table_name: str = Field(alias="tableName")
     columns: list[DatabaseTableColumn] = Field(default_factory=list)
+    record_count: int | str | None = Field(default=None, alias="recordCount")
 
 
 ColumnType = Literal["string", "datetime", "integer", "float", "boolean", "uuid", "json", "file"]
