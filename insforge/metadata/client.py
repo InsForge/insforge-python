@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from .._base_client import BaseClient
+from .models import ApiKeyMetadata
 from .models import AppMetadata
 from .models import DatabaseMetadata
 
@@ -32,3 +33,15 @@ class MetadataClient:
             access_token=access_token,
         )
         return DatabaseMetadata.model_validate(payload)
+
+    async def get_api_key(
+        self,
+        *,
+        access_token: str | None = None,
+    ) -> ApiKeyMetadata:
+        payload = await self._client._request_json(
+            "GET",
+            "/api/metadata/api-key",
+            access_token=access_token,
+        )
+        return ApiKeyMetadata.model_validate(payload)

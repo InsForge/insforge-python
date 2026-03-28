@@ -42,3 +42,9 @@ class DatabaseMetadata(BaseModel):
     total_records: int = Field(alias="totalRecords")
     database_size: str = Field(alias="databaseSize")
     last_updated: datetime = Field(alias="lastUpdated")
+
+
+class ApiKeyMetadata(BaseModel):
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    api_key: str = Field(alias="apiKey")
