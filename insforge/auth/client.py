@@ -6,6 +6,9 @@ from typing import Any
 from .._base_client import BaseClient
 from .._utils import quote_path_segment
 from ..exceptions import InsforgeAuthError
+from .models import AuthEmailActionResponse
+from .models import AuthEmailVerificationRequest
+from .models import AuthEmailVerifyRequest
 from .models import AdminSessionExchangeRequest
 from .models import AnonymousTokenResponse
 from .models import AuthConfigResponse
@@ -15,6 +18,9 @@ from .models import AuthDeleteUsersRequest
 from .models import AuthDeleteUsersResponse
 from .models import AuthSessionResponse
 from .models import AuthUserCreateRequest
+from .models import AuthResetPasswordExchangeRequest
+from .models import AuthResetPasswordExchangeResponse
+from .models import AuthResetPasswordRequest
 from .models import AuthUsersResponse
 from .models import CurrentProfileResponse
 from .models import LogoutResponse
@@ -46,6 +52,40 @@ class AuthClient:
             exception_cls=InsforgeAuthError,
         )
         return SignInResponse.model_validate(payload)
+
+    async def send_email_verification(
+        self,
+        *,
+        email: str,
+        redirect_to: str | None = None,
+    ) -> AuthEmailActionResponse:
+        payload = AuthEmailVerificationRequest(
+            email=email,
+            redirect_to=redirect_to,
+        ).model_dump(by_alias=True, exclude_none=True)
+        response = await self._client._request_json(
+            "POST",
+            "/api/auth/email/send-verification",
+            json=payload,
+            exception_cls=InsforgeAuthError,
+        )
+        return AuthEmailActionResponse.model_validate(response)
+
+    async def verify_email(
+        self,
+        *,
+        email: str,
+        otp: str,
+    ) -> AuthSessionResponse:
+        payload = AuthEmailVerifyRequest(email=email, otp=otp).model_dump(by_alias=True)
+        response = await self._client._request_json(
+            "POST",
+            "/api/auth/email/verify",
+            params=SERVER_CLIENT_TYPE_PARAMS,
+            json=payload,
+            exception_cls=InsforgeAuthError,
+        )
+        return AuthSessionResponse.model_validate(response)
 
     async def get_public_config(self) -> PublicAuthConfigResponse:
         payload = await self._client._request_json("GET", "/api/auth/public-config")
@@ -177,6 +217,57 @@ class AuthClient:
             exception_cls=InsforgeAuthError,
         )
         return AuthSessionResponse.model_validate(payload)
+
+    async def send_reset_password_email(
+        self,
+        *,
+        email: str,
+        redirect_to: str | None = None,
+    ) -> AuthEmailActionResponse:
+        payload = AuthEmailVerificationRequest(
+            email=email,
+            redirect_to=redirect_to,
+        ).model_dump(by_alias=True, exclude_none=True)
+        response = await self._client._request_json(
+            "POST",
+            "/api/auth/email/send-reset-password",
+            json=payload,
+            exception_cls=InsforgeAuthError,
+        )
+        return AuthEmailActionResponse.model_validate(response)
+
+    async def exchange_reset_password_token(
+        self,
+        *,
+        email: str,
+        code: str,
+    ) -> AuthResetPasswordExchangeResponse:
+        payload = AuthResetPasswordExchangeRequest(email=email, code=code).model_dump(by_alias=True)
+        response = await self._client._request_json(
+            "POST",
+            "/api/auth/email/exchange-reset-password-token",
+            json=payload,
+            exception_cls=InsforgeAuthError,
+        )
+        return AuthResetPasswordExchangeResponse.model_validate(response)
+
+    async def reset_password(
+        self,
+        *,
+        new_password: str,
+        otp: str,
+    ) -> AuthEmailActionResponse:
+        payload = AuthResetPasswordRequest(new_password=new_password, otp=otp).model_dump(
+            by_alias=True,
+            exclude_none=True,
+        )
+        response = await self._client._request_json(
+            "POST",
+            "/api/auth/email/reset-password",
+            json=payload,
+            exception_cls=InsforgeAuthError,
+        )
+        return AuthEmailActionResponse.model_validate(response)
 
     async def logout(self) -> LogoutResponse:
         payload = await self._client._request_json("POST", "/api/auth/logout")

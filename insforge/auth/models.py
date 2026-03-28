@@ -13,6 +13,48 @@ class SignInResponse(BaseModel):
     refresh_token: str = Field(alias="refreshToken")
 
 
+class AuthEmailActionResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    success: bool | None = None
+    message: str | None = None
+
+
+class AuthEmailVerificationRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    email: str
+    redirect_to: str | None = Field(default=None, alias="redirectTo")
+
+
+class AuthEmailVerifyRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    email: str
+    otp: str
+
+
+class AuthResetPasswordExchangeRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    email: str
+    code: str
+
+
+class AuthResetPasswordExchangeResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    token: str | None = None
+    expires_at: datetime | None = Field(default=None, alias="expiresAt")
+
+
+class AuthResetPasswordRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    new_password: str = Field(alias="newPassword")
+    otp: str
+
+
 class CurrentProfileResponse(BaseModel):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 

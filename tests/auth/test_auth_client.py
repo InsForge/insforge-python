@@ -424,3 +424,119 @@ def test_sign_in_with_password_raises_insforge_auth_error_on_failure() -> None:
 
     assert exc_info.value.error == "UNAUTHORIZED"
     assert exc_info.value.message == "Invalid credentials"
+
+
+def test_email_verification_and_reset_password_json_endpoints_request_expected_payloads() -> None:
+    async def scenario() -> tuple[list[dict[str, object]], object, object, object, object, object]:
+        calls: list[dict[str, object]] = []
+
+        async def fake_request(method: str, url: httpx.URL, **kwargs: object) -> httpx.Response:
+            calls.append({"method": method, "url": str(url), "kwargs": kwargs})
+
+            if str(url).endswith("/api/auth/email/send-verification"):
+                return httpx.Response(202, json={"success": True, "message": "Verification email sent"})
+
+            if str(url).endswith("/api/auth/email/verify"):
+                return httpx.Response(
+                    200,
+                    json={
+                        "user": {
+                            "id": "u1",
+                            "email": "a@example.com",
+                            "profile": {"name": "Ada"},
+                            "emailVerified": True,
+                        },
+                        "accessToken": "access",
+                        "refreshToken": "refresh",
+                    },
+                )
+
+            if str(url).endswith("/api/auth/email/send-reset-password"):
+                return httpx.Response(202, json={"success": True, "message": "Reset email sent"})
+
+            if str(url).endswith("/api/auth/email/exchange-reset-password-token"):
+                return httpx.Response(200, json={"token": "reset-token", "expiresAt": "2026-03-28T12:34:56Z"})
+
+            return httpx.Response(200, json={"message": "Password reset successfully"})
+
+        async with InsforgeClient(
+            base_url="https://example.com",
+            api_key="ins_test",
+        ) as client:
+            client.http_client.request = fake_request  # type: ignore[method-assign]
+            send_verification = await client.auth.send_email_verification(
+                email="a@example.com",
+                redirect_to="https://app.example.com/sign-in",
+            )
+            verify = await client.auth.verify_email(
+                email="a@example.com",
+                otp="123456",
+            )
+            send_reset = await client.auth.send_reset_password_email(
+                email="a@example.com",
+                redirect_to="https://app.example.com/reset-password",
+            )
+            exchange = await client.auth.exchange_reset_password_token(
+                email="a@example.com",
+                code="123456",
+            )
+            reset = await client.auth.reset_password(
+                new_password="new-password",
+                otp="reset-token",
+            )
+
+            return calls, send_verification, verify, send_reset, exchange, reset
+
+    calls, send_verification, verify, send_reset, exchange, reset = asyncio.run(scenario())
+
+    assert calls[0]["method"] == "POST"
+    assert calls[0]["url"] == "https://example.com/api/auth/email/send-verification"
+    assert calls[0]["kwargs"]["json"] == {
+        "email": "a@example.com",
+        "redirectTo": "https://app.example.com/sign-in",
+    }
+    assert calls[0]["kwargs"]["headers"]["X-API-Key"] == "ins_test"
+    assert "Authorization" not in calls[0]["kwargs"]["headers"]
+
+    assert calls[1]["method"] == "POST"
+    assert calls[1]["url"] == "https://example.com/api/auth/email/verify"
+    assert calls[1]["kwargs"]["params"] == {"client_type": "server"}
+    assert calls[1]["kwargs"]["json"] == {"email": "a@example.com", "otp": "123456"}
+    assert calls[1]["kwargs"]["headers"]["X-API-Key"] == "ins_test"
+    assert "Authorization" not in calls[1]["kwargs"]["headers"]
+
+    assert calls[2]["method"] == "POST"
+    assert calls[2]["url"] == "https://example.com/api/auth/email/send-reset-password"
+    assert calls[2]["kwargs"]["json"] == {
+        "email": "a@example.com",
+        "redirectTo": "https://app.example.com/reset-password",
+    }
+    assert calls[2]["kwargs"]["headers"]["X-API-Key"] == "ins_test"
+    assert "Authorization" not in calls[2]["kwargs"]["headers"]
+
+    assert calls[3]["method"] == "POST"
+    assert calls[3]["url"] == "https://example.com/api/auth/email/exchange-reset-password-token"
+    assert calls[3]["kwargs"]["json"] == {"email": "a@example.com", "code": "123456"}
+    assert calls[3]["kwargs"]["headers"]["X-API-Key"] == "ins_test"
+    assert "Authorization" not in calls[3]["kwargs"]["headers"]
+
+    assert calls[4]["method"] == "POST"
+    assert calls[4]["url"] == "https://example.com/api/auth/email/reset-password"
+    assert calls[4]["kwargs"]["json"] == {"newPassword": "new-password", "otp": "reset-token"}
+    assert calls[4]["kwargs"]["headers"]["X-API-Key"] == "ins_test"
+    assert "Authorization" not in calls[4]["kwargs"]["headers"]
+
+    assert send_verification.success is True
+    assert send_verification.message == "Verification email sent"
+
+    assert verify.user.email == "a@example.com"
+    assert verify.access_token == "access"
+    assert verify.refresh_token == "refresh"
+
+    assert send_reset.success is True
+    assert send_reset.message == "Reset email sent"
+
+    assert exchange.token == "reset-token"
+    assert exchange.expires_at.isoformat() == "2026-03-28T12:34:56+00:00"
+
+    assert reset.message == "Password reset successfully"
