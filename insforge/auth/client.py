@@ -255,9 +255,9 @@ class AuthClient:
         self,
         *,
         new_password: str,
-        otp: str,
+        token: str,
     ) -> AuthEmailActionResponse:
-        payload = AuthResetPasswordRequest(new_password=new_password, otp=otp).model_dump(
+        payload = AuthResetPasswordRequest(new_password=new_password, token=token).model_dump(
             by_alias=True,
             exclude_none=True,
         )

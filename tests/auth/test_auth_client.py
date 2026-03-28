@@ -482,7 +482,7 @@ def test_email_verification_and_reset_password_json_endpoints_request_expected_p
             )
             reset = await client.auth.reset_password(
                 new_password="new-password",
-                otp="reset-token",
+                token="reset-token",
             )
 
             return calls, send_verification, verify, send_reset, exchange, reset
@@ -540,3 +540,45 @@ def test_email_verification_and_reset_password_json_endpoints_request_expected_p
     assert exchange.expires_at.isoformat() == "2026-03-28T12:34:56+00:00"
 
     assert reset.message == "Password reset successfully"
+
+
+def test_auth_email_json_endpoints_omit_optional_redirect_and_raise_auth_errors() -> None:
+    async def scenario() -> tuple[dict[str, object], dict[str, object]]:
+        captured_send: dict[str, object] = {}
+        captured_verify: dict[str, object] = {}
+
+        async def fake_request(method: str, url: httpx.URL, **kwargs: object) -> httpx.Response:
+            if str(url).endswith("/api/auth/email/send-verification"):
+                captured_send["method"] = method
+                captured_send["url"] = str(url)
+                captured_send["kwargs"] = kwargs
+                return httpx.Response(202, json={"success": True, "message": "Verification email sent"})
+
+            captured_verify["method"] = method
+            captured_verify["url"] = str(url)
+            captured_verify["kwargs"] = kwargs
+            return httpx.Response(401, json={"error": "INVALID_OTP", "message": "Verification code expired"})
+
+        async with InsforgeClient(
+            base_url="https://example.com",
+            api_key="ins_test",
+        ) as client:
+            client.http_client.request = fake_request  # type: ignore[method-assign]
+            response = await client.auth.send_email_verification(email="a@example.com")
+            assert response.success is True
+
+            try:
+                await client.auth.verify_email(email="a@example.com", otp="123456")
+            except InsforgeAuthError as exc:
+                assert exc.error == "INVALID_OTP"
+                assert exc.message == "Verification code expired"
+            else:
+                raise AssertionError("verify_email should raise InsforgeAuthError on 401")
+
+            return captured_send, captured_verify
+
+    captured_send, captured_verify = asyncio.run(scenario())
+
+    assert captured_send["kwargs"]["json"] == {"email": "a@example.com"}
+    assert "Authorization" not in captured_send["kwargs"]["headers"]
+    assert captured_verify["kwargs"]["params"] == {"client_type": "server"}

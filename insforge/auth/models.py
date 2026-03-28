@@ -52,7 +52,7 @@ class AuthResetPasswordRequest(BaseModel):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
     new_password: str = Field(alias="newPassword")
-    otp: str
+    token: str = Field(alias="otp")
 
 
 class CurrentProfileResponse(BaseModel):
