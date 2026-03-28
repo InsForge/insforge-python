@@ -1,8 +1,11 @@
 import asyncio
 
 import httpx
+import pytest
+from pydantic import ValidationError
 
 from insforge import InsforgeClient
+from insforge.email.models import SendRawEmailRequest
 
 
 def test_send_raw_uses_explicit_access_token_and_request_body() -> None:
@@ -40,4 +43,24 @@ def test_send_raw_uses_explicit_access_token_and_request_body() -> None:
     }
     assert captured["kwargs"]["headers"]["X-API-Key"] == "ins_test"
     assert captured["kwargs"]["headers"]["Authorization"] == "Bearer user_token"
+
+
+def test_send_raw_rejects_empty_subject() -> None:
+    with pytest.raises(ValidationError):
+        SendRawEmailRequest(to="a@b.com", subject="", html="<p>hi</p>")
+
+
+def test_send_raw_rejects_empty_html() -> None:
+    with pytest.raises(ValidationError):
+        SendRawEmailRequest(to="a@b.com", subject="Hi", html="")
+
+
+def test_send_raw_rejects_subject_exceeding_max_length() -> None:
+    with pytest.raises(ValidationError):
+        SendRawEmailRequest(to="a@b.com", subject="x" * 501, html="<p>hi</p>")
+
+
+def test_send_raw_rejects_from_exceeding_max_length() -> None:
+    with pytest.raises(ValidationError):
+        SendRawEmailRequest(to="a@b.com", subject="Hi", html="<p>hi</p>", from_="x" * 101)
 

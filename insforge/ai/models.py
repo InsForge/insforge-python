@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Any
+from typing import Literal
 
 from pydantic import BaseModel
 from pydantic import ConfigDict
@@ -20,13 +21,16 @@ class AIConfiguration(BaseModel):
     updated_at: datetime = Field(alias="updatedAt")
 
 
+Modality = Literal["text", "image"]
+
+
 class AIConfigurationCreateRequest(BaseModel):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-    input_modality: list[str] = Field(alias="inputModality")
-    output_modality: list[str] = Field(alias="outputModality")
-    provider: str
-    model_id: str = Field(alias="modelId")
+    input_modality: list[Modality] = Field(min_length=1, alias="inputModality")
+    output_modality: list[Modality] = Field(min_length=1, alias="outputModality")
+    provider: str = Field(min_length=1)
+    model_id: str = Field(min_length=1, alias="modelId")
     system_prompt: str | None = Field(default=None, alias="systemPrompt")
 
 
@@ -99,7 +103,7 @@ class AICreditsResponse(BaseModel):
 class AIChatMessage(BaseModel):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-    role: str
+    role: Literal["user", "assistant", "system", "tool"]
     content: str | None = None
     tool_calls: list[dict[str, Any]] | None = Field(default=None, alias="tool_calls")
     tool_call_id: str | None = Field(default=None, alias="tool_call_id")
@@ -108,8 +112,8 @@ class AIChatMessage(BaseModel):
 class AIChatCompletionRequest(BaseModel):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-    model: str
-    messages: list[AIChatMessage]
+    model: str = Field(min_length=1)
+    messages: list[AIChatMessage] = Field(min_length=1)
     stream: bool = False
 
 
@@ -140,8 +144,8 @@ class AIChatCompletionResponse(BaseModel):
 class AIImageGenerationRequest(BaseModel):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-    model: str
-    prompt: str
+    model: str = Field(min_length=1)
+    prompt: str = Field(min_length=1)
 
 
 class AIImageURL(BaseModel):
@@ -187,10 +191,10 @@ class AIImageGenerationResponse(BaseModel):
 class AIEmbeddingsRequest(BaseModel):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-    model: str
+    model: str = Field(min_length=1)
     input: str | list[str]
-    encoding_format: str | None = Field(default=None, alias="encoding_format")
-    dimensions: int | None = None
+    encoding_format: Literal["float", "base64"] | None = Field(default=None, alias="encoding_format")
+    dimensions: int | None = Field(default=None, ge=0)
 
 
 class AIEmbeddingObject(BaseModel):

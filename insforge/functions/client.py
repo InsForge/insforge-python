@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from typing import Any
+from typing import Literal
 
 from .._base_client import BaseClient
 from .._utils import quote_path_segment
@@ -24,7 +25,7 @@ class FunctionsClient:
         slug: str | None = None,
         code: str,
         description: str | None = None,
-        status: str | None = None,
+        status: Literal["draft", "active"] | None = None,
         access_token: str | None = None,
     ) -> FunctionMutationResponse:
         payload = FunctionCreateRequest(
@@ -49,7 +50,7 @@ class FunctionsClient:
         name: str | None = None,
         code: str | None = None,
         description: str | None = None,
-        status: str | None = None,
+        status: Literal["draft", "active", "error"] | None = None,
         access_token: str | None = None,
     ) -> FunctionMutationResponse:
         payload = FunctionUpdateRequest(

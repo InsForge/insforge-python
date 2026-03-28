@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from typing import Any
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class DatabaseQueryResponse(BaseModel):
@@ -38,19 +39,23 @@ class DatabaseTableSchemaResponse(BaseModel):
     columns: list[DatabaseTableColumn] = Field(default_factory=list)
 
 
+ColumnType = Literal["string", "datetime", "integer", "float", "boolean", "uuid", "json", "file"]
+ForeignKeyAction = Literal["CASCADE", "SET NULL", "NO ACTION", "RESTRICT"]
+
+
 class DatabaseTableCreateForeignKey(BaseModel):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-    table: str
-    column: str
-    on_delete: str = Field(default="NO ACTION", alias="onDelete")
+    table: str = Field(min_length=1)
+    column: str = Field(min_length=1)
+    on_delete: ForeignKeyAction = Field(default="NO ACTION", alias="onDelete")
 
 
 class DatabaseTableCreateColumn(BaseModel):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-    name: str
-    type: str
+    name: str = Field(min_length=1)
+    type: ColumnType
     nullable: bool
     unique: bool | None = None
     default_value: str | None = Field(default=None, alias="defaultValue")
@@ -60,16 +65,16 @@ class DatabaseTableCreateColumn(BaseModel):
 class DatabaseCreateTableRequest(BaseModel):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-    table_name: str = Field(alias="tableName")
-    columns: list[DatabaseTableCreateColumn]
+    table_name: str = Field(min_length=1, alias="tableName")
+    columns: list[DatabaseTableCreateColumn] = Field(min_length=1)
     rls_enabled: bool | None = Field(default=None, alias="rlsEnabled")
 
 
 class DatabaseTableSchemaAddColumn(BaseModel):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-    column_name: str = Field(alias="columnName")
-    type: str
+    column_name: str = Field(min_length=1, alias="columnName")
+    type: ColumnType
     is_nullable: bool | None = Field(default=None, alias="isNullable")
     is_unique: bool | None = Field(default=None, alias="isUnique")
     default_value: str | None = Field(default=None, alias="defaultValue")
@@ -78,31 +83,31 @@ class DatabaseTableSchemaAddColumn(BaseModel):
 class DatabaseTableSchemaUpdateColumn(BaseModel):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-    column_name: str = Field(alias="columnName")
-    new_column_name: str | None = Field(default=None, alias="newColumnName")
+    column_name: str = Field(min_length=1, alias="columnName")
+    new_column_name: str | None = Field(default=None, min_length=1, max_length=64, alias="newColumnName")
     default_value: str | None = Field(default=None, alias="defaultValue")
 
 
 class DatabaseTableSchemaUpdateForeignKey(BaseModel):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-    reference_table: str = Field(alias="referenceTable")
-    reference_column: str = Field(alias="referenceColumn")
-    on_delete: str | None = Field(default=None, alias="onDelete")
-    on_update: str | None = Field(default=None, alias="onUpdate")
+    reference_table: str = Field(min_length=1, alias="referenceTable")
+    reference_column: str = Field(min_length=1, alias="referenceColumn")
+    on_delete: ForeignKeyAction | None = Field(default=None, alias="onDelete")
+    on_update: ForeignKeyAction | None = Field(default=None, alias="onUpdate")
 
 
 class DatabaseTableSchemaAddForeignKey(BaseModel):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-    column_name: str = Field(alias="columnName")
+    column_name: str = Field(min_length=1, alias="columnName")
     foreign_key: DatabaseTableSchemaUpdateForeignKey = Field(alias="foreignKey")
 
 
 class DatabaseTableSchemaRenameRequest(BaseModel):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-    new_table_name: str = Field(alias="newTableName")
+    new_table_name: str = Field(min_length=1, max_length=64, alias="newTableName")
 
 
 class DatabaseTableSchemaUpdateRequest(BaseModel):
@@ -114,6 +119,20 @@ class DatabaseTableSchemaUpdateRequest(BaseModel):
     add_foreign_keys: list[DatabaseTableSchemaAddForeignKey] | None = Field(default=None, alias="addForeignKeys")
     drop_foreign_keys: list[str] | None = Field(default=None, alias="dropForeignKeys")
     rename_table: DatabaseTableSchemaRenameRequest | None = Field(default=None, alias="renameTable")
+
+    @model_validator(mode="before")
+    def require_operation(cls, values):
+        fields = (
+            "addColumns", "add_columns",
+            "dropColumns", "drop_columns",
+            "updateColumns", "update_columns",
+            "addForeignKeys", "add_foreign_keys",
+            "dropForeignKeys", "drop_foreign_keys",
+            "renameTable", "rename_table",
+        )
+        if not any(values.get(f) is not None for f in fields):
+            raise ValueError("update_table_schema requires at least one schema operation")
+        return values
 
 
 class DatabaseTableMutationResponse(BaseModel):

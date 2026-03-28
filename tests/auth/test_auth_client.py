@@ -2,8 +2,11 @@ import asyncio
 
 import httpx
 import pytest
+from pydantic import ValidationError
 
 from insforge import InsforgeClient
+from insforge.auth.models import AuthConfigUpdateRequest
+from insforge.auth.models import AuthUserCreateRequest
 from insforge.exceptions import InsforgeAuthError
 
 
@@ -582,3 +585,27 @@ def test_auth_email_json_endpoints_omit_optional_redirect_and_raise_auth_errors(
     assert captured_send["kwargs"]["json"] == {"email": "a@example.com"}
     assert "Authorization" not in captured_send["kwargs"]["headers"]
     assert captured_verify["kwargs"]["params"] == {"client_type": "server"}
+
+
+def test_create_user_rejects_empty_email_and_password() -> None:
+    with pytest.raises(ValidationError):
+        AuthUserCreateRequest(email="", password="secret")
+    with pytest.raises(ValidationError):
+        AuthUserCreateRequest(email="a@b.com", password="")
+
+
+def test_config_update_rejects_empty_payload() -> None:
+    with pytest.raises(ValidationError):
+        AuthConfigUpdateRequest()
+
+
+def test_config_update_rejects_invalid_verify_method() -> None:
+    with pytest.raises(ValidationError):
+        AuthConfigUpdateRequest(verify_email_method="sms")  # type: ignore[arg-type]
+
+
+def test_config_update_rejects_invalid_password_min_length() -> None:
+    with pytest.raises(ValidationError):
+        AuthConfigUpdateRequest(password_min_length=2)
+    with pytest.raises(ValidationError):
+        AuthConfigUpdateRequest(password_min_length=200)

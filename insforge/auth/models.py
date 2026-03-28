@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Any
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class SignInResponse(BaseModel):
@@ -23,22 +24,22 @@ class AuthEmailActionResponse(BaseModel):
 class AuthEmailVerificationRequest(BaseModel):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-    email: str
+    email: str = Field(min_length=1)
     redirect_to: str | None = Field(default=None, alias="redirectTo")
 
 
 class AuthEmailVerifyRequest(BaseModel):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-    email: str
-    otp: str
+    email: str = Field(min_length=1)
+    otp: str = Field(min_length=1)
 
 
 class AuthResetPasswordExchangeRequest(BaseModel):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-    email: str
-    code: str
+    email: str = Field(min_length=1)
+    code: str = Field(min_length=1)
 
 
 class AuthResetPasswordExchangeResponse(BaseModel):
@@ -51,8 +52,8 @@ class AuthResetPasswordExchangeResponse(BaseModel):
 class AuthResetPasswordRequest(BaseModel):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-    new_password: str = Field(alias="newPassword")
-    token: str = Field(alias="otp")
+    new_password: str = Field(min_length=1, alias="newPassword")
+    token: str = Field(min_length=1, alias="otp")
 
 
 class CurrentProfileResponse(BaseModel):
@@ -68,13 +69,13 @@ class PublicAuthConfigResponse(BaseModel):
     o_auth_providers: list[str] = Field(default_factory=list, alias="oAuthProviders")
     custom_o_auth_providers: list[str] = Field(default_factory=list, alias="customOAuthProviders")
     require_email_verification: bool | None = Field(default=None, alias="requireEmailVerification")
-    password_min_length: int | None = Field(default=None, alias="passwordMinLength")
+    password_min_length: int | None = Field(default=None, ge=4, le=128, alias="passwordMinLength")
     require_number: bool | None = Field(default=None, alias="requireNumber")
     require_lowercase: bool | None = Field(default=None, alias="requireLowercase")
     require_uppercase: bool | None = Field(default=None, alias="requireUppercase")
     require_special_char: bool | None = Field(default=None, alias="requireSpecialChar")
-    verify_email_method: str | None = Field(default=None, alias="verifyEmailMethod")
-    reset_password_method: str | None = Field(default=None, alias="resetPasswordMethod")
+    verify_email_method: Literal["code", "link"] | None = Field(default=None, alias="verifyEmailMethod")
+    reset_password_method: Literal["code", "link"] | None = Field(default=None, alias="resetPasswordMethod")
 
 
 class ProfileResponse(BaseModel):
@@ -89,13 +90,13 @@ class AuthConfigResponse(BaseModel):
 
     id: str | None = None
     require_email_verification: bool | None = Field(default=None, alias="requireEmailVerification")
-    password_min_length: int | None = Field(default=None, alias="passwordMinLength")
+    password_min_length: int | None = Field(default=None, ge=4, le=128, alias="passwordMinLength")
     require_number: bool | None = Field(default=None, alias="requireNumber")
     require_lowercase: bool | None = Field(default=None, alias="requireLowercase")
     require_uppercase: bool | None = Field(default=None, alias="requireUppercase")
     require_special_char: bool | None = Field(default=None, alias="requireSpecialChar")
-    verify_email_method: str | None = Field(default=None, alias="verifyEmailMethod")
-    reset_password_method: str | None = Field(default=None, alias="resetPasswordMethod")
+    verify_email_method: Literal["code", "link"] | None = Field(default=None, alias="verifyEmailMethod")
+    reset_password_method: Literal["code", "link"] | None = Field(default=None, alias="resetPasswordMethod")
     allowed_redirect_urls: list[str] = Field(default_factory=list, alias="allowedRedirectUrls")
     created_at: datetime | None = Field(default=None, alias="createdAt")
     updated_at: datetime | None = Field(default=None, alias="updatedAt")
@@ -105,14 +106,31 @@ class AuthConfigUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
     require_email_verification: bool | None = Field(default=None, alias="requireEmailVerification")
-    password_min_length: int | None = Field(default=None, alias="passwordMinLength")
+    password_min_length: int | None = Field(default=None, ge=4, le=128, alias="passwordMinLength")
     require_number: bool | None = Field(default=None, alias="requireNumber")
     require_lowercase: bool | None = Field(default=None, alias="requireLowercase")
     require_uppercase: bool | None = Field(default=None, alias="requireUppercase")
     require_special_char: bool | None = Field(default=None, alias="requireSpecialChar")
-    verify_email_method: str | None = Field(default=None, alias="verifyEmailMethod")
-    reset_password_method: str | None = Field(default=None, alias="resetPasswordMethod")
+    verify_email_method: Literal["code", "link"] | None = Field(default=None, alias="verifyEmailMethod")
+    reset_password_method: Literal["code", "link"] | None = Field(default=None, alias="resetPasswordMethod")
     allowed_redirect_urls: list[str] | None = Field(default=None, alias="allowedRedirectUrls")
+
+    @model_validator(mode="before")
+    def require_field(cls, values):
+        fields = (
+            "requireEmailVerification", "require_email_verification",
+            "passwordMinLength", "password_min_length",
+            "requireNumber", "require_number",
+            "requireLowercase", "require_lowercase",
+            "requireUppercase", "require_uppercase",
+            "requireSpecialChar", "require_special_char",
+            "verifyEmailMethod", "verify_email_method",
+            "resetPasswordMethod", "reset_password_method",
+            "allowedRedirectUrls", "allowed_redirect_urls",
+        )
+        if not any(values.get(f) is not None for f in fields):
+            raise ValueError("update_config requires at least one field")
+        return values
 
 
 class UserResponse(BaseModel):
@@ -131,8 +149,8 @@ class UserResponse(BaseModel):
 class AuthUserCreateRequest(BaseModel):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-    email: str
-    password: str
+    email: str = Field(min_length=1)
+    password: str = Field(min_length=1)
     name: str | None = None
     redirect_to: str | None = Field(default=None, alias="redirectTo")
 
@@ -155,7 +173,7 @@ class AuthUsersResponse(BaseModel):
 class AuthDeleteUsersRequest(BaseModel):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-    user_ids: list[str] = Field(alias="userIds")
+    user_ids: list[str] = Field(min_length=1, alias="userIds")
 
 
 class AuthDeleteUsersResponse(BaseModel):
@@ -192,13 +210,13 @@ class AuthSessionResponse(BaseModel):
 class RefreshRequest(BaseModel):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-    refresh_token: str = Field(alias="refreshToken")
+    refresh_token: str = Field(min_length=1, alias="refreshToken")
 
 
 class AdminSessionExchangeRequest(BaseModel):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-    code: str
+    code: str = Field(min_length=1)
 
 
 class LogoutResponse(BaseModel):

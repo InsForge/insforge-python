@@ -1,9 +1,14 @@
 import asyncio
 
 import httpx
+import pytest
+from pydantic import ValidationError
 
 from insforge import InsforgeClient
+from insforge.database.models import DatabaseCreateTableRequest
+from insforge.database.models import DatabaseTableCreateColumn
 from insforge.database.models import DatabaseTableSchemaResponse
+from insforge.database.models import DatabaseTableSchemaUpdateRequest
 from insforge.database.models import DatabaseTableMutationResponse
 
 
@@ -341,3 +346,26 @@ def test_delete_table_uses_delete_endpoint_and_returns_mutation_response() -> No
     assert isinstance(result, DatabaseTableMutationResponse)
     assert result.message == "Table deleted successfully"
     assert result.table_name == "posts"
+
+
+def test_create_table_rejects_invalid_column_type() -> None:
+    with pytest.raises(ValidationError):
+        DatabaseTableCreateColumn(name="col", type="invalid", nullable=False)  # type: ignore[arg-type]
+
+
+def test_create_table_rejects_empty_table_name() -> None:
+    with pytest.raises(ValidationError):
+        DatabaseCreateTableRequest(
+            table_name="",
+            columns=[{"name": "id", "type": "uuid", "nullable": False}],
+        )
+
+
+def test_create_table_rejects_empty_columns_list() -> None:
+    with pytest.raises(ValidationError):
+        DatabaseCreateTableRequest(table_name="posts", columns=[])
+
+
+def test_schema_update_rejects_empty_payload() -> None:
+    with pytest.raises(ValidationError):
+        DatabaseTableSchemaUpdateRequest()

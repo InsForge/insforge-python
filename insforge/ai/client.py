@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from .._base_client import BaseClient
 from .._utils import quote_path_segment
@@ -54,8 +55,8 @@ class AIClient:
     async def create_configuration(
         self,
         *,
-        input_modality: list[str],
-        output_modality: list[str],
+        input_modality: list[Literal["text", "image"]],
+        output_modality: list[Literal["text", "image"]],
         provider: str,
         model_id: str,
         system_prompt: str | None = None,
@@ -240,7 +241,7 @@ class AIClient:
         model: str,
         input: str | list[str],
         access_token: str | None = None,
-        encoding_format: str | None = None,
+        encoding_format: Literal["float", "base64"] | None = None,
         dimensions: int | None = None,
     ) -> AIEmbeddingsResponse:
         payload = AIEmbeddingsRequest(

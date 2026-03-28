@@ -1,6 +1,8 @@
 import asyncio
 
 import httpx
+import pytest
+from pydantic import ValidationError
 
 from insforge import InsforgeClient
 from insforge.ai.models import AIConfiguration
@@ -13,6 +15,11 @@ from insforge.ai.models import AIEmbeddingsResponse
 from insforge.ai.models import AIListModelsResponse
 from insforge.ai.models import AIImageGenerationResponse
 from insforge.ai.models import AIUsageSummary
+from insforge.ai.models import AIChatMessage
+from insforge.ai.models import AIChatCompletionRequest
+from insforge.ai.models import AIConfigurationCreateRequest
+from insforge.ai.models import AIEmbeddingsRequest
+from insforge.ai.models import AIImageGenerationRequest
 
 
 def test_list_ai_configurations_returns_typed_models() -> None:
@@ -395,3 +402,43 @@ def test_generate_embeddings_sends_request_body_and_returns_typed_model() -> Non
     assert isinstance(result, AIEmbeddingsResponse)
     assert result.data[0].embedding == [0.1, 0.2]
     assert result.metadata.model == "google/gemini-embedding-001"
+
+
+def test_chat_message_rejects_invalid_role() -> None:
+    with pytest.raises(ValidationError):
+        AIChatMessage(role="invalid", content="hello")  # type: ignore[arg-type]
+
+
+def test_chat_completion_request_rejects_empty_model() -> None:
+    with pytest.raises(ValidationError):
+        AIChatCompletionRequest(model="", messages=[AIChatMessage(role="user", content="hi")])
+
+
+def test_chat_completion_request_rejects_empty_messages() -> None:
+    with pytest.raises(ValidationError):
+        AIChatCompletionRequest(model="gpt-4", messages=[])
+
+
+def test_configuration_create_rejects_invalid_modality() -> None:
+    with pytest.raises(ValidationError):
+        AIConfigurationCreateRequest(
+            input_modality=["audio"],  # type: ignore[list-item]
+            output_modality=["text"],
+            provider="openrouter",
+            model_id="gpt-4",
+        )
+
+
+def test_image_generation_rejects_empty_prompt() -> None:
+    with pytest.raises(ValidationError):
+        AIImageGenerationRequest(model="dall-e-3", prompt="")
+
+
+def test_embeddings_rejects_invalid_encoding_format() -> None:
+    with pytest.raises(ValidationError):
+        AIEmbeddingsRequest(model="emb-001", input="hello", encoding_format="binary")  # type: ignore[arg-type]
+
+
+def test_embeddings_rejects_negative_dimensions() -> None:
+    with pytest.raises(ValidationError):
+        AIEmbeddingsRequest(model="emb-001", input="hello", dimensions=-1)

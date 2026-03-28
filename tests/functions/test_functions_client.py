@@ -1,6 +1,8 @@
 import asyncio
 
 import httpx
+import pytest
+from pydantic import ValidationError
 
 from insforge import InsforgeClient
 from insforge.functions.models import FunctionDeleteResponse
@@ -365,3 +367,27 @@ def test_delete_function_uses_api_path_and_returns_typed_delete_response() -> No
     assert isinstance(result, FunctionDeleteResponse)
     assert result.success is True
     assert result.message == "Function hello-world deleted successfully"
+
+
+def test_create_function_rejects_invalid_inputs() -> None:
+    async def scenario() -> None:
+        async with InsforgeClient(base_url="https://example.com", api_key="ins_test") as client:
+            await client.functions.create_function(
+                name="",
+                slug="Bad Slug!",
+                code="",
+                status="invalid",  # type: ignore[arg-type]
+                access_token="admin_token",
+            )
+
+    with pytest.raises(ValidationError):
+        asyncio.run(scenario())
+
+
+def test_update_function_requires_at_least_one_field() -> None:
+    async def scenario() -> None:
+        async with InsforgeClient(base_url="https://example.com", api_key="ins_test") as client:
+            await client.functions.update_function("hello-world", access_token="admin_token")
+
+    with pytest.raises(ValueError):
+        asyncio.run(scenario())
