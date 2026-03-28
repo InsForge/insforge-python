@@ -37,7 +37,7 @@ class DatabaseClient:
     ) -> DatabaseTableSchemaResponse:
         payload = await self._client._request_json(
             "GET",
-            f"/api/database/tables/{table_name}/schema",
+            f"/api/database/tables/{quote_path_segment(table_name)}/schema",
             access_token=access_token,
         )
         return DatabaseTableSchemaResponse.model_validate(payload)
@@ -75,6 +75,19 @@ class DatabaseClient:
         rename_table: DatabaseTableSchemaRenameRequest | dict[str, object] | None = None,
         access_token: str | None = None,
     ) -> DatabaseTableMutationResponse:
+        if not any(
+            value is not None
+            for value in (
+                add_columns,
+                drop_columns,
+                update_columns,
+                add_foreign_keys,
+                drop_foreign_keys,
+                rename_table,
+            )
+        ):
+            raise ValueError("update_table_schema requires at least one schema operation")
+
         payload = DatabaseTableSchemaUpdateRequest(
             add_columns=add_columns,
             drop_columns=drop_columns,

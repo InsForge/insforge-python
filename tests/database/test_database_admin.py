@@ -82,6 +82,31 @@ def test_get_table_schema_returns_typed_model_from_schema_endpoint() -> None:
     assert result.columns[0].name == "id"
 
 
+def test_get_table_schema_quotes_table_name_path_segment() -> None:
+    async def scenario() -> dict[str, object]:
+        captured: dict[str, object] = {}
+
+        async def fake_request(method: str, url: httpx.URL, **kwargs: object) -> httpx.Response:
+            captured["method"] = method
+            captured["url"] = str(url)
+            captured["kwargs"] = kwargs
+            return httpx.Response(200, json={"table_name": "analytics/events", "columns": []})
+
+        async with InsforgeClient(
+            base_url="https://example.com",
+            api_key="ins_test",
+        ) as client:
+            client.http_client.request = fake_request  # type: ignore[method-assign]
+            result = await client.database.get_table_schema("analytics/events")
+            assert isinstance(result, DatabaseTableSchemaResponse)
+            return captured
+
+    captured = asyncio.run(scenario())
+
+    assert captured["method"] == "GET"
+    assert captured["url"] == "https://example.com/api/database/tables/analytics%2Fevents/schema"
+
+
 def test_create_table_uses_post_schema_endpoint_and_serializes_request_body() -> None:
     async def scenario() -> tuple[object, dict[str, object]]:
         captured: dict[str, object] = {}
@@ -162,6 +187,22 @@ def test_create_table_uses_post_schema_endpoint_and_serializes_request_body() ->
     assert isinstance(result, DatabaseTableMutationResponse)
     assert result.message == "Table created successfully"
     assert result.table_name == "posts"
+
+
+def test_update_table_schema_rejects_empty_mutation_request() -> None:
+    async def scenario() -> None:
+        async with InsforgeClient(
+            base_url="https://example.com",
+            api_key="ins_test",
+        ) as client:
+            await client.database.update_table_schema("posts")
+
+    try:
+        asyncio.run(scenario())
+    except ValueError as exc:
+        assert str(exc) == "update_table_schema requires at least one schema operation"
+    else:
+        raise AssertionError("update_table_schema should reject empty mutation requests")
 
 
 def test_update_table_schema_uses_patch_schema_endpoint_and_serializes_request_body() -> None:
