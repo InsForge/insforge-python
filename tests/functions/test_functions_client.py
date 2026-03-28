@@ -3,7 +3,9 @@ import asyncio
 import httpx
 
 from insforge import InsforgeClient
+from insforge.functions.models import FunctionDeleteResponse
 from insforge.functions.models import FunctionDetails
+from insforge.functions.models import FunctionMutationResponse
 from insforge.functions.models import FunctionMetadata
 
 
@@ -208,3 +210,158 @@ def test_get_function_uses_api_path_and_returns_full_function_details() -> None:
     assert isinstance(result, FunctionDetails)
     assert result.slug == "hello-world"
     assert result.code.startswith("export default")
+
+
+def test_create_function_uses_api_path_and_returns_typed_mutation_response() -> None:
+    async def scenario() -> tuple[object, dict[str, object]]:
+        captured: dict[str, object] = {}
+
+        async def fake_request(method: str, url: httpx.URL, **kwargs: object) -> httpx.Response:
+            captured["method"] = method
+            captured["url"] = str(url)
+            captured["kwargs"] = kwargs
+            return httpx.Response(
+                201,
+                json={
+                    "success": True,
+                    "function": {
+                        "id": "123e4567-e89b-12d3-a456-426614174000",
+                        "slug": "hello-world",
+                        "name": "Hello World Function",
+                        "description": "Returns a greeting message",
+                        "status": "active",
+                        "created_at": "2024-01-21T10:30:00Z",
+                        "updated_at": "2024-01-21T10:35:00Z",
+                        "deployed_at": "2024-01-21T10:35:00Z",
+                    },
+                },
+            )
+
+        async with InsforgeClient(
+            base_url="https://example.com",
+            api_key="ins_test",
+        ) as client:
+            client.http_client.request = fake_request  # type: ignore[method-assign]
+            result = await client.functions.create_function(
+                name="Hello World Function",
+                slug="hello-world",
+                code="export default async function () { return new Response('hi'); }",
+                description="Returns a greeting message",
+                status="active",
+                access_token="admin_token",
+            )
+            return result, captured
+
+    result, captured = asyncio.run(scenario())
+
+    assert captured["method"] == "POST"
+    assert captured["url"] == "https://example.com/api/functions"
+    assert captured["kwargs"]["headers"]["X-API-Key"] == "ins_test"
+    assert captured["kwargs"]["headers"]["Authorization"] == "Bearer admin_token"
+    assert captured["kwargs"]["json"] == {
+        "name": "Hello World Function",
+        "slug": "hello-world",
+        "code": "export default async function () { return new Response('hi'); }",
+        "description": "Returns a greeting message",
+        "status": "active",
+    }
+    assert isinstance(result, FunctionMutationResponse)
+    assert result.success is True
+    assert isinstance(result.function, FunctionMetadata)
+    assert result.function.slug == "hello-world"
+
+
+def test_update_function_uses_api_path_and_returns_typed_mutation_response() -> None:
+    async def scenario() -> tuple[object, dict[str, object]]:
+        captured: dict[str, object] = {}
+
+        async def fake_request(method: str, url: httpx.URL, **kwargs: object) -> httpx.Response:
+            captured["method"] = method
+            captured["url"] = str(url)
+            captured["kwargs"] = kwargs
+            return httpx.Response(
+                200,
+                json={
+                    "success": True,
+                    "function": {
+                        "id": "123e4567-e89b-12d3-a456-426614174000",
+                        "slug": "hello-world",
+                        "name": "Hello World Function v2",
+                        "description": "Returns a greeting message",
+                        "status": "active",
+                        "created_at": "2024-01-21T10:30:00Z",
+                        "updated_at": "2024-01-21T11:00:00Z",
+                        "deployed_at": "2024-01-21T10:35:00Z",
+                    },
+                },
+            )
+
+        async with InsforgeClient(
+            base_url="https://example.com",
+            api_key="ins_test",
+        ) as client:
+            client.http_client.request = fake_request  # type: ignore[method-assign]
+            result = await client.functions.update_function(
+                "hello-world",
+                name="Hello World Function v2",
+                code="export default async function () { return new Response('hi'); }",
+                description="Returns a greeting message",
+                status="active",
+                access_token="admin_token",
+            )
+            return result, captured
+
+    result, captured = asyncio.run(scenario())
+
+    assert captured["method"] == "PUT"
+    assert captured["url"] == "https://example.com/api/functions/hello-world"
+    assert captured["kwargs"]["headers"]["X-API-Key"] == "ins_test"
+    assert captured["kwargs"]["headers"]["Authorization"] == "Bearer admin_token"
+    assert captured["kwargs"]["json"] == {
+        "name": "Hello World Function v2",
+        "code": "export default async function () { return new Response('hi'); }",
+        "description": "Returns a greeting message",
+        "status": "active",
+    }
+    assert isinstance(result, FunctionMutationResponse)
+    assert result.success is True
+    assert result.function.name == "Hello World Function v2"
+
+
+def test_delete_function_uses_api_path_and_returns_typed_delete_response() -> None:
+    async def scenario() -> tuple[object, dict[str, object]]:
+        captured: dict[str, object] = {}
+
+        async def fake_request(method: str, url: httpx.URL, **kwargs: object) -> httpx.Response:
+            captured["method"] = method
+            captured["url"] = str(url)
+            captured["kwargs"] = kwargs
+            return httpx.Response(
+                200,
+                json={
+                    "success": True,
+                    "message": "Function hello-world deleted successfully",
+                },
+            )
+
+        async with InsforgeClient(
+            base_url="https://example.com",
+            api_key="ins_test",
+        ) as client:
+            client.http_client.request = fake_request  # type: ignore[method-assign]
+            result = await client.functions.delete_function(
+                "hello-world",
+                access_token="admin_token",
+            )
+            return result, captured
+
+    result, captured = asyncio.run(scenario())
+
+    assert captured["method"] == "DELETE"
+    assert captured["url"] == "https://example.com/api/functions/hello-world"
+    assert captured["kwargs"]["headers"]["X-API-Key"] == "ins_test"
+    assert captured["kwargs"]["headers"]["Authorization"] == "Bearer admin_token"
+    assert captured["kwargs"].get("json") is None
+    assert isinstance(result, FunctionDeleteResponse)
+    assert result.success is True
+    assert result.message == "Function hello-world deleted successfully"
