@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          pip install -e .
+          pip install pytest pytest-asyncio
+
+      - name: Run unit tests
+        run: python -m pytest tests/ --ignore=tests/test_integration.py -v
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          pip install -e .
+          pip install pytest pytest-asyncio
+
+      - name: Run integration tests
+        env:
+          INSFORGE_API_KEY: ${{ secrets.INSFORGE_API_KEY }}
+          INSFORGE_API_BASE_URL: ${{ secrets.INSFORGE_API_BASE_URL }}
+          INSFORGE_TEST_EMAIL: ${{ secrets.INSFORGE_TEST_EMAIL }}
+          INSFORGE_TEST_PASSWORD: ${{ secrets.INSFORGE_TEST_PASSWORD }}
+          INSFORGE_FUNCTION_SLUG: ${{ secrets.INSFORGE_FUNCTION_SLUG }}
+          INSFORGE_TABLE_NAME: ${{ secrets.INSFORGE_TABLE_NAME }}
+        run: python -m pytest tests/test_integration.py -v
