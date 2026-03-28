@@ -4,10 +4,17 @@ from datetime import datetime
 
 from .._base_client import BaseClient
 from .._utils import quote_path_segment
+from .models import AIChatCompletionRequest
+from .models import AIChatCompletionResponse
+from .models import AIChatMessage
 from .models import AIConfiguration
 from .models import AIConfigurationCreateRequest
 from .models import AIConfigurationCreateResponse
 from .models import AIConfigurationDeleteResponse
+from .models import AIEmbeddingsRequest
+from .models import AIEmbeddingsResponse
+from .models import AIImageGenerationRequest
+from .models import AIImageGenerationResponse
 from .models import AIConfigurationUpdateRequest
 from .models import AIConfigurationUpdateResponse
 from .models import AICreditsResponse
@@ -188,3 +195,64 @@ class AIClient:
             access_token=access_token,
         )
         return AIListModelsResponse.model_validate(payload)
+
+    async def chat_completion(
+        self,
+        *,
+        model: str,
+        messages: list[AIChatMessage],
+        access_token: str | None = None,
+    ) -> AIChatCompletionResponse:
+        payload = AIChatCompletionRequest(
+            model=model,
+            messages=messages,
+        ).model_dump(by_alias=True, exclude_none=True)
+        response = await self._client._request_json(
+            "POST",
+            "/api/ai/chat/completion",
+            json=payload,
+            access_token=access_token,
+        )
+        return AIChatCompletionResponse.model_validate(response)
+
+    async def generate_images(
+        self,
+        *,
+        model: str,
+        prompt: str,
+        access_token: str | None = None,
+    ) -> AIImageGenerationResponse:
+        payload = AIImageGenerationRequest(
+            model=model,
+            prompt=prompt,
+        ).model_dump(by_alias=True, exclude_none=True)
+        response = await self._client._request_json(
+            "POST",
+            "/api/ai/image/generation",
+            json=payload,
+            access_token=access_token,
+        )
+        return AIImageGenerationResponse.model_validate(response)
+
+    async def generate_embeddings(
+        self,
+        *,
+        model: str,
+        input: str | list[str],
+        access_token: str | None = None,
+        encoding_format: str | None = None,
+        dimensions: int | None = None,
+    ) -> AIEmbeddingsResponse:
+        payload = AIEmbeddingsRequest(
+            model=model,
+            input=input,
+            encoding_format=encoding_format,
+            dimensions=dimensions,
+        ).model_dump(by_alias=True, exclude_none=True)
+        response = await self._client._request_json(
+            "POST",
+            "/api/ai/embeddings",
+            json=payload,
+            access_token=access_token,
+        )
+        return AIEmbeddingsResponse.model_validate(response)

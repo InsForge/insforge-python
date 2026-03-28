@@ -8,7 +8,10 @@ from insforge.ai.models import AIConfigurationCreateResponse
 from insforge.ai.models import AIConfigurationDeleteResponse
 from insforge.ai.models import AIConfigurationUpdateResponse
 from insforge.ai.models import AICreditsResponse
+from insforge.ai.models import AIChatCompletionResponse
+from insforge.ai.models import AIEmbeddingsResponse
 from insforge.ai.models import AIListModelsResponse
+from insforge.ai.models import AIImageGenerationResponse
 from insforge.ai.models import AIUsageSummary
 
 
@@ -236,3 +239,159 @@ def test_get_ai_credits_and_models_return_typed_models() -> None:
     assert isinstance(models, AIListModelsResponse)
     assert models.text[0].provider == "openrouter"
     assert models.text[0].models[0].id == "openai/gpt-4o-mini"
+
+
+def test_chat_completion_sends_request_body_and_returns_typed_model() -> None:
+    async def scenario() -> tuple[object, dict[str, object]]:
+        captured: dict[str, object] = {}
+
+        async def fake_request(method: str, url: httpx.URL, **kwargs: object) -> httpx.Response:
+            captured["method"] = method
+            captured["url"] = str(url)
+            captured["kwargs"] = kwargs
+            return httpx.Response(
+                200,
+                json={
+                    "text": "Hello there",
+                    "metadata": {
+                        "model": "openai/gpt-4o-mini",
+                        "usage": {
+                            "promptTokens": 3,
+                            "completionTokens": 4,
+                            "totalTokens": 7,
+                        },
+                    },
+                },
+            )
+
+        async with InsforgeClient(
+            base_url="https://example.com",
+            api_key="ins_test",
+        ) as client:
+            client.http_client.request = fake_request  # type: ignore[method-assign]
+            result = await client.ai.chat_completion(
+                model="openai/gpt-4o-mini",
+                messages=[{"role": "user", "content": "Say hi"}],
+                access_token="client_token",
+            )
+            return result, captured
+
+    result, captured = asyncio.run(scenario())
+
+    assert captured["method"] == "POST"
+    assert captured["url"] == "https://example.com/api/ai/chat/completion"
+    assert captured["kwargs"]["headers"]["X-API-Key"] == "ins_test"
+    assert captured["kwargs"]["headers"]["Authorization"] == "Bearer client_token"
+    assert captured["kwargs"]["json"] == {
+        "model": "openai/gpt-4o-mini",
+        "messages": [{"role": "user", "content": "Say hi"}],
+        "stream": False,
+    }
+    assert isinstance(result, AIChatCompletionResponse)
+    assert result.text == "Hello there"
+    assert result.metadata.model == "openai/gpt-4o-mini"
+
+
+def test_generate_images_sends_request_body_and_returns_typed_model() -> None:
+    async def scenario() -> tuple[object, dict[str, object]]:
+        captured: dict[str, object] = {}
+
+        async def fake_request(method: str, url: httpx.URL, **kwargs: object) -> httpx.Response:
+            captured["method"] = method
+            captured["url"] = str(url)
+            captured["kwargs"] = kwargs
+            return httpx.Response(
+                200,
+                json={
+                    "model": "openai/dall-e-3",
+                    "images": [
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": "https://example.com/image.png"},
+                        }
+                    ],
+                    "count": 1,
+                    "nextActions": "Images have been generated successfully.",
+                },
+            )
+
+        async with InsforgeClient(
+            base_url="https://example.com",
+            api_key="ins_test",
+        ) as client:
+            client.http_client.request = fake_request  # type: ignore[method-assign]
+            result = await client.ai.generate_images(
+                model="openai/dall-e-3",
+                prompt="A red fox in a snowy forest",
+                access_token="client_token",
+            )
+            return result, captured
+
+    result, captured = asyncio.run(scenario())
+
+    assert captured["method"] == "POST"
+    assert captured["url"] == "https://example.com/api/ai/image/generation"
+    assert captured["kwargs"]["headers"]["Authorization"] == "Bearer client_token"
+    assert captured["kwargs"]["json"] == {
+        "model": "openai/dall-e-3",
+        "prompt": "A red fox in a snowy forest",
+    }
+    assert isinstance(result, AIImageGenerationResponse)
+    assert result.count == 1
+    assert result.images[0].image_url.url == "https://example.com/image.png"
+
+
+def test_generate_embeddings_sends_request_body_and_returns_typed_model() -> None:
+    async def scenario() -> tuple[object, dict[str, object]]:
+        captured: dict[str, object] = {}
+
+        async def fake_request(method: str, url: httpx.URL, **kwargs: object) -> httpx.Response:
+            captured["method"] = method
+            captured["url"] = str(url)
+            captured["kwargs"] = kwargs
+            return httpx.Response(
+                200,
+                json={
+                    "object": "list",
+                    "data": [
+                        {
+                            "object": "embedding",
+                            "embedding": [0.1, 0.2],
+                            "index": 0,
+                        }
+                    ],
+                    "metadata": {
+                        "model": "google/gemini-embedding-001",
+                        "usage": {
+                            "promptTokens": 2,
+                            "completionTokens": 0,
+                            "totalTokens": 2,
+                        },
+                    },
+                },
+            )
+
+        async with InsforgeClient(
+            base_url="https://example.com",
+            api_key="ins_test",
+        ) as client:
+            client.http_client.request = fake_request  # type: ignore[method-assign]
+            result = await client.ai.generate_embeddings(
+                model="google/gemini-embedding-001",
+                input=["hello", "world"],
+                access_token="client_token",
+            )
+            return result, captured
+
+    result, captured = asyncio.run(scenario())
+
+    assert captured["method"] == "POST"
+    assert captured["url"] == "https://example.com/api/ai/embeddings"
+    assert captured["kwargs"]["headers"]["Authorization"] == "Bearer client_token"
+    assert captured["kwargs"]["json"] == {
+        "model": "google/gemini-embedding-001",
+        "input": ["hello", "world"],
+    }
+    assert isinstance(result, AIEmbeddingsResponse)
+    assert result.data[0].embedding == [0.1, 0.2]
+    assert result.metadata.model == "google/gemini-embedding-001"

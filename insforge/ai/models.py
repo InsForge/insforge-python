@@ -96,6 +96,134 @@ class AICreditsResponse(BaseModel):
     usage: float | None = None
 
 
+class AIChatMessage(BaseModel):
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    role: str
+    content: str | None = None
+    tool_calls: list[dict[str, Any]] | None = Field(default=None, alias="tool_calls")
+    tool_call_id: str | None = Field(default=None, alias="tool_call_id")
+
+
+class AIChatCompletionRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    model: str
+    messages: list[AIChatMessage]
+    stream: bool = False
+
+
+class AIChatCompletionUsage(BaseModel):
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    prompt_tokens: int | None = Field(default=None, alias="promptTokens")
+    completion_tokens: int | None = Field(default=None, alias="completionTokens")
+    total_tokens: int | None = Field(default=None, alias="totalTokens")
+
+
+class AIChatCompletionMetadata(BaseModel):
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    model: str | None = None
+    usage: AIChatCompletionUsage | None = None
+
+
+class AIChatCompletionResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    text: str | None = None
+    tool_calls: list[dict[str, Any]] = Field(default_factory=list, alias="tool_calls")
+    annotations: list[dict[str, Any]] = Field(default_factory=list)
+    metadata: AIChatCompletionMetadata | None = None
+
+
+class AIImageGenerationRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    model: str
+    prompt: str
+
+
+class AIImageURL(BaseModel):
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    url: str | None = None
+
+
+class AIImageMessage(BaseModel):
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    type: str | None = None
+    image_url: AIImageURL | None = Field(default=None, alias="image_url")
+
+
+class AIImageGenerationUsage(BaseModel):
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    prompt_tokens: int | None = Field(default=None, alias="promptTokens")
+    completion_tokens: int | None = Field(default=None, alias="completionTokens")
+    total_tokens: int | None = Field(default=None, alias="totalTokens")
+
+
+class AIImageGenerationMetadata(BaseModel):
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    model: str | None = None
+    revised_prompt: str | None = Field(default=None, alias="revisedPrompt")
+    usage: AIImageGenerationUsage | None = None
+
+
+class AIImageGenerationResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    model: str | None = None
+    images: list[AIImageMessage] = Field(default_factory=list)
+    text: str | None = None
+    count: int | None = None
+    metadata: AIImageGenerationMetadata | None = None
+    next_actions: str | None = Field(default=None, alias="nextActions")
+
+
+class AIEmbeddingsRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    model: str
+    input: str | list[str]
+    encoding_format: str | None = Field(default=None, alias="encoding_format")
+    dimensions: int | None = None
+
+
+class AIEmbeddingObject(BaseModel):
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    object: str | None = None
+    embedding: list[float] = Field(default_factory=list)
+    index: int | None = None
+
+
+class AIEmbeddingsUsage(BaseModel):
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    prompt_tokens: int | None = Field(default=None, alias="promptTokens")
+    completion_tokens: int | None = Field(default=None, alias="completionTokens")
+    total_tokens: int | None = Field(default=None, alias="totalTokens")
+
+
+class AIEmbeddingsMetadata(BaseModel):
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    model: str | None = None
+    usage: AIEmbeddingsUsage | None = None
+
+
+class AIEmbeddingsResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    object: str | None = None
+    data: list[AIEmbeddingObject] = Field(default_factory=list)
+    metadata: AIEmbeddingsMetadata | None = None
+
+
 class OpenRouterModel(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
