@@ -50,8 +50,8 @@ class DatabaseQuery:
         joined_values = ",".join(str(value) for value in values)
         return self._with_param(column, f"in.({joined_values})")
 
-    def is_null(self, column: str, value: bool = True) -> "DatabaseQuery":
-        return self._with_param(column, "is.null" if value else "not.is.null")
+    def is_null(self, column: str) -> "DatabaseQuery":
+        return self._with_param(column, "is.null")
 
     def order(self, column: str, desc: bool = False) -> "DatabaseQuery":
         direction = "desc" if desc else "asc"
@@ -81,7 +81,6 @@ class DatabaseQuery:
         response = await self._client._request(
             "POST",
             f"/api/database/records/{self._table_name}",
-            params=self._build_params() or None,
             json=rows,
             access_token=access_token,
             extra_headers={"Prefer": "return=representation"} if return_representation else None,

@@ -13,7 +13,7 @@ def test_database_query_builder_maps_common_read_operators_and_pagination() -> N
             captured["method"] = method
             captured["url"] = str(url)
             captured["kwargs"] = kwargs
-            return httpx.Response(200, json={"data": []})
+            return httpx.Response(200, json=[])
 
         async with InsforgeClient(
             base_url="https://example.com",
@@ -63,7 +63,18 @@ def test_database_query_builder_maps_common_read_operators_and_pagination() -> N
     }
     assert captured["kwargs"]["headers"]["Authorization"] == "Bearer user_token"
     assert captured["kwargs"]["headers"]["X-API-Key"] == "ins_test"
-    assert result == {"data": []}
+    assert result == []
+
+
+def test_database_query_is_null_does_not_expose_inverse_form() -> None:
+    query = InsforgeClient(base_url="https://example.com", api_key="ins_test").database.from_("posts")
+
+    try:
+        query.is_null("deleted_at", False)  # type: ignore[call-arg]
+    except TypeError:
+        pass
+    else:
+        raise AssertionError("is_null should not accept a boolean flag")
 
 
 def test_database_query_insert_sends_array_body_and_prefer_return_representation() -> None:
@@ -81,10 +92,16 @@ def test_database_query_insert_sends_array_body_and_prefer_return_representation
             api_key="ins_test",
         ) as client:
             client.http_client.request = fake_request  # type: ignore[method-assign]
-            result = await client.database.from_("posts").insert(
-                [{"title": "Hello", "published": True}],
-                return_representation=True,
-                access_token="user_token",
+            result = await (
+                client.database.from_("posts")
+                .select("id,title")
+                .eq("status", "active")
+                .limit(5)
+                .insert(
+                    [{"title": "Hello", "published": True}],
+                    return_representation=True,
+                    access_token="user_token",
+                )
             )
 
             return result, captured
@@ -93,6 +110,7 @@ def test_database_query_insert_sends_array_body_and_prefer_return_representation
 
     assert captured["method"] == "POST"
     assert captured["url"] == "https://example.com/api/database/records/posts"
+    assert "params" not in captured["kwargs"] or captured["kwargs"]["params"] is None
     assert captured["kwargs"]["json"] == [{"title": "Hello", "published": True}]
     assert captured["kwargs"]["headers"]["Authorization"] == "Bearer user_token"
     assert captured["kwargs"]["headers"]["X-API-Key"] == "ins_test"
