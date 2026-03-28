@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from typing import Any
 from typing import Mapping
+from urllib.parse import urlsplit
 
 import httpx
 
+from .exceptions import InsforgeHTTPError
 from ._utils import normalize_base_url
 
 
@@ -42,6 +45,46 @@ class BaseClient:
             access_token=access_token,
             extra_headers=extra_headers,
         )
+
+    def _build_url(self, path: str) -> httpx.URL:
+        parsed_path = urlsplit(path)
+        normalized_path = parsed_path.path.lstrip("/")
+        base_path = self.base_url.path.rstrip("/")
+
+        if base_path:
+            full_path = f"{base_path}/{normalized_path}"
+        else:
+            full_path = f"/{normalized_path}"
+
+        query = parsed_path.query.encode() if parsed_path.query else None
+
+        return self.base_url.copy_with(path=full_path, query=query)
+
+    async def _request_json(
+        self,
+        method: str,
+        path: str,
+        *,
+        params: Mapping[str, str] | None = None,
+        json: Any = None,
+        access_token: str | None = None,
+        extra_headers: Mapping[str, str] | None = None,
+    ) -> object:
+        response = await self.http_client.request(
+            method,
+            self._build_url(path),
+            params=params,
+            json=json,
+            headers=self._build_headers(
+                access_token=access_token,
+                extra_headers=extra_headers,
+            ),
+        )
+
+        if response.is_error:
+            raise InsforgeHTTPError.from_response(method, path, response)
+
+        return response.json()
 
     async def aclose(self) -> None:
         await self.http_client.aclose()
