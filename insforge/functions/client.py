@@ -40,11 +40,10 @@ class FunctionsClient:
         *,
         body: Mapping[str, Any] | None = None,
         access_token: str | None = None,
-    ) -> dict[str, object]:
-        payload = await self._client._request_json(
+    ) -> object:
+        return await self._client._request_content(
             "POST",
             f"/functions/{quote_path_segment(slug)}",
             json=dict(body) if body is not None else None,
             access_token=access_token,
         )
-        return payload  # runtime currently returns generic JSON objects

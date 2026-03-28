@@ -66,6 +66,64 @@ def test_invoke_with_access_token_sets_authorization_header() -> None:
     assert captured["kwargs"]["headers"]["Authorization"] == "Bearer user_token"
 
 
+def test_invoke_returns_plain_text_for_text_responses() -> None:
+    async def scenario() -> tuple[object, dict[str, object]]:
+        captured: dict[str, object] = {}
+
+        async def fake_request(method: str, url: httpx.URL, **kwargs: object) -> httpx.Response:
+            captured["method"] = method
+            captured["url"] = str(url)
+            captured["kwargs"] = kwargs
+            return httpx.Response(
+                200,
+                content=b"hello from runtime",
+                headers={"Content-Type": "text/plain; charset=utf-8"},
+            )
+
+        async with InsforgeClient(
+            base_url="https://example.com",
+            api_key="ins_test",
+        ) as client:
+            client.http_client.request = fake_request  # type: ignore[method-assign]
+            result = await client.functions.invoke("hello-world")
+            return result, captured
+
+    result, captured = asyncio.run(scenario())
+
+    assert captured["method"] == "POST"
+    assert captured["url"] == "https://example.com/functions/hello-world"
+    assert result == "hello from runtime"
+
+
+def test_invoke_returns_bytes_for_binary_responses() -> None:
+    async def scenario() -> tuple[object, dict[str, object]]:
+        captured: dict[str, object] = {}
+
+        async def fake_request(method: str, url: httpx.URL, **kwargs: object) -> httpx.Response:
+            captured["method"] = method
+            captured["url"] = str(url)
+            captured["kwargs"] = kwargs
+            return httpx.Response(
+                200,
+                content=b"\x89PNG\r\n\x1a\n",
+                headers={"Content-Type": "image/png"},
+            )
+
+        async with InsforgeClient(
+            base_url="https://example.com",
+            api_key="ins_test",
+        ) as client:
+            client.http_client.request = fake_request  # type: ignore[method-assign]
+            result = await client.functions.invoke("hello-world")
+            return result, captured
+
+    result, captured = asyncio.run(scenario())
+
+    assert captured["method"] == "POST"
+    assert captured["url"] == "https://example.com/functions/hello-world"
+    assert result == b"\x89PNG\r\n\x1a\n"
+
+
 def test_list_functions_uses_api_path_and_returns_typed_models() -> None:
     async def scenario() -> tuple[object, dict[str, object]]:
         captured: dict[str, object] = {}
@@ -95,7 +153,7 @@ def test_list_functions_uses_api_path_and_returns_typed_models() -> None:
             api_key="ins_test",
         ) as client:
             client.http_client.request = fake_request  # type: ignore[method-assign]
-            result = await client.functions.list_functions()
+            result = await client.functions.list_functions(access_token="admin_token")
             return result, captured
 
     result, captured = asyncio.run(scenario())
@@ -103,7 +161,7 @@ def test_list_functions_uses_api_path_and_returns_typed_models() -> None:
     assert captured["method"] == "GET"
     assert captured["url"] == "https://example.com/api/functions"
     assert captured["kwargs"]["headers"]["X-API-Key"] == "ins_test"
-    assert "Authorization" not in captured["kwargs"]["headers"]
+    assert captured["kwargs"]["headers"]["Authorization"] == "Bearer admin_token"
     assert len(result) == 1
     assert isinstance(result[0], FunctionMetadata)
     assert result[0].slug == "hello-world"
@@ -138,7 +196,7 @@ def test_get_function_uses_api_path_and_returns_full_function_details() -> None:
             api_key="ins_test",
         ) as client:
             client.http_client.request = fake_request  # type: ignore[method-assign]
-            result = await client.functions.get_function("hello-world")
+            result = await client.functions.get_function("hello-world", access_token="admin_token")
             return result, captured
 
     result, captured = asyncio.run(scenario())
@@ -146,7 +204,7 @@ def test_get_function_uses_api_path_and_returns_full_function_details() -> None:
     assert captured["method"] == "GET"
     assert captured["url"] == "https://example.com/api/functions/hello-world"
     assert captured["kwargs"]["headers"]["X-API-Key"] == "ins_test"
-    assert "Authorization" not in captured["kwargs"]["headers"]
+    assert captured["kwargs"]["headers"]["Authorization"] == "Bearer admin_token"
     assert isinstance(result, FunctionDetails)
     assert result.slug == "hello-world"
     assert result.code.startswith("export default")

@@ -71,6 +71,60 @@ class BaseClient:
         extra_headers: Mapping[str, str] | None = None,
         exception_cls: type[InsforgeHTTPError] = InsforgeHTTPError,
     ) -> object:
+        response = await self._request(
+            method,
+            path,
+            params=params,
+            json=json,
+            access_token=access_token,
+            extra_headers=extra_headers,
+            exception_cls=exception_cls,
+        )
+
+        return response.json()
+
+    async def _request_content(
+        self,
+        method: str,
+        path: str,
+        *,
+        params: Mapping[str, str] | None = None,
+        json: Any = None,
+        access_token: str | None = None,
+        extra_headers: Mapping[str, str] | None = None,
+        exception_cls: type[InsforgeHTTPError] = InsforgeHTTPError,
+    ) -> object:
+        response = await self._request(
+            method,
+            path,
+            params=params,
+            json=json,
+            access_token=access_token,
+            extra_headers=extra_headers,
+            exception_cls=exception_cls,
+        )
+
+        content_type = response.headers.get("content-type", "").split(";", maxsplit=1)[0].strip().lower()
+
+        if content_type.startswith("text/"):
+            return response.text
+
+        if content_type.endswith("+json") or content_type == "application/json":
+            return response.json()
+
+        return response.content
+
+    async def _request(
+        self,
+        method: str,
+        path: str,
+        *,
+        params: Mapping[str, str] | None = None,
+        json: Any = None,
+        access_token: str | None = None,
+        extra_headers: Mapping[str, str] | None = None,
+        exception_cls: type[InsforgeHTTPError] = InsforgeHTTPError,
+    ) -> httpx.Response:
         response = await self.http_client.request(
             method,
             self._build_url(path),
@@ -85,7 +139,7 @@ class BaseClient:
         if response.is_error:
             raise exception_cls.from_response(method, path, response)
 
-        return response.json()
+        return response
 
     async def aclose(self) -> None:
         await self.http_client.aclose()
