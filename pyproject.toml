@@ -16,9 +16,12 @@ dependencies = [
 [tool.setuptools]
 packages = [
     "insforge",
+    "insforge.ai",
     "insforge.auth",
     "insforge.database",
+    "insforge.email",
     "insforge.functions",
+    "insforge.metadata",
     "insforge.storage",
 ]
 
