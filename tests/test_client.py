@@ -1,3 +1,7 @@
+import asyncio
+
+import httpx
+
 from insforge._base_client import build_headers
 from insforge import InsforgeClient
 
@@ -44,3 +48,15 @@ def test_build_headers_rejects_authorization_override() -> None:
 
     assert "Authorization" not in headers
     assert headers["X-Test"] == "1"
+
+
+def test_client_owns_async_http_client_and_supports_context_manager() -> None:
+    async def use_client() -> tuple[InsforgeClient, bool]:
+        async with InsforgeClient(base_url="https://example.com/", api_key="ins_test") as client:
+            return client, isinstance(client.http_client, httpx.AsyncClient)
+
+    client, is_async_client = asyncio.run(use_client())
+
+    assert isinstance(client.http_client, httpx.AsyncClient)
+    assert is_async_client is True
+    assert client.http_client.is_closed is True

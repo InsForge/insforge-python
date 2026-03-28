@@ -35,3 +35,22 @@ def test_http_error_normalizes_next_actions_field() -> None:
     exc = InsforgeHTTPError.from_response("POST", "/api/test", response)
 
     assert exc.next_action == "Fix request"
+
+
+def test_http_error_preserves_raw_text_for_non_json_response() -> None:
+    response = httpx.Response(503, content=b"service unavailable")
+
+    exc = InsforgeHTTPError.from_response("GET", "/api/test", response)
+
+    assert exc.error == "UNKNOWN_ERROR"
+    assert exc.message == "service unavailable"
+    assert exc.raw_payload == "service unavailable"
+
+
+def test_http_error_uses_unknown_error_for_non_object_json_payload() -> None:
+    response = httpx.Response(400, json=["bad", "payload"])
+
+    exc = InsforgeHTTPError.from_response("GET", "/api/test", response)
+
+    assert exc.error == "UNKNOWN_ERROR"
+    assert exc.raw_payload == ["bad", "payload"]
