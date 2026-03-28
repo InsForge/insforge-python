@@ -69,6 +69,7 @@ class BaseClient:
         json: Any = None,
         access_token: str | None = None,
         extra_headers: Mapping[str, str] | None = None,
+        exception_cls: type[InsforgeHTTPError] = InsforgeHTTPError,
     ) -> object:
         response = await self.http_client.request(
             method,
@@ -82,7 +83,7 @@ class BaseClient:
         )
 
         if response.is_error:
-            raise InsforgeHTTPError.from_response(method, path, response)
+            raise exception_cls.from_response(method, path, response)
 
         return response.json()
 

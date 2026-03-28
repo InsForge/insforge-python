@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from .._base_client import BaseClient
+from ..exceptions import InsforgeAuthError
 from .models import CurrentProfileResponse, SignInResponse
 
 
@@ -21,6 +22,7 @@ class AuthClient:
             "POST",
             "/api/auth/sessions?client_type=server",
             json={"email": email, "password": password},
+            exception_cls=InsforgeAuthError,
         )
         return SignInResponse.model_validate(payload)
 
@@ -35,5 +37,6 @@ class AuthClient:
             "/api/auth/profiles/current",
             json={"profile": dict(profile)},
             access_token=access_token,
+            exception_cls=InsforgeAuthError,
         )
         return CurrentProfileResponse.model_validate(payload)

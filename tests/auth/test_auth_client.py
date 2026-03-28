@@ -1,8 +1,10 @@
 import asyncio
 
 import httpx
+import pytest
 
 from insforge import InsforgeClient
+from insforge.exceptions import InsforgeAuthError
 
 
 def test_sign_in_with_password_returns_tokens_without_mutating_client_state() -> None:
@@ -42,6 +44,8 @@ def test_sign_in_with_password_returns_tokens_without_mutating_client_state() ->
     assert result.refresh_token == "refresh"
     assert captured["method"] == "POST"
     assert captured["url"] == "https://example.com/api/auth/sessions?client_type=server"
+    assert captured["kwargs"]["json"] == {"email": "a@example.com", "password": "secret"}
+    assert captured["kwargs"]["headers"]["X-API-Key"] == "ins_test"
 
 
 def test_update_current_profile_sends_bearer_token() -> None:
@@ -76,6 +80,36 @@ def test_update_current_profile_sends_bearer_token() -> None:
 
     assert captured["method"] == "PATCH"
     assert captured["url"] == "https://example.com/api/auth/profiles/current"
+    assert captured["kwargs"]["json"] == {"profile": {"name": "Ada"}}
+    assert captured["kwargs"]["headers"]["X-API-Key"] == "ins_test"
     assert captured["kwargs"]["headers"]["Authorization"] == "Bearer user_token"
     assert result.user_id == "u1"
     assert result.profile == {"name": "Ada"}
+
+
+def test_sign_in_with_password_raises_insforge_auth_error_on_failure() -> None:
+    async def scenario() -> None:
+        async def fake_request(method: str, url: httpx.URL, **kwargs: object) -> httpx.Response:
+            return httpx.Response(
+                401,
+                json={
+                    "error": "UNAUTHORIZED",
+                    "message": "Invalid credentials",
+                },
+            )
+
+        async with InsforgeClient(
+            base_url="https://example.com",
+            api_key="ins_test",
+        ) as client:
+            client.http_client.request = fake_request  # type: ignore[method-assign]
+            await client.auth.sign_in_with_password(
+                email="a@example.com",
+                password="secret",
+            )
+
+    with pytest.raises(InsforgeAuthError) as exc_info:
+        asyncio.run(scenario())
+
+    assert exc_info.value.error == "UNAUTHORIZED"
+    assert exc_info.value.message == "Invalid credentials"
