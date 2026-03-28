@@ -43,7 +43,8 @@ def test_sign_in_with_password_returns_tokens_without_mutating_client_state() ->
     assert result.access_token == "access"
     assert result.refresh_token == "refresh"
     assert captured["method"] == "POST"
-    assert captured["url"] == "https://example.com/api/auth/sessions?client_type=server"
+    assert captured["url"] == "https://example.com/api/auth/sessions"
+    assert captured["kwargs"]["params"] == {"client_type": "server"}
     assert captured["kwargs"]["json"] == {"email": "a@example.com", "password": "secret"}
     assert captured["kwargs"]["headers"]["X-API-Key"] == "ins_test"
 

@@ -25,6 +25,9 @@ from .models import SignInResponse
 from .models import UserResponse
 
 
+SERVER_CLIENT_TYPE_PARAMS = {"client_type": "server"}
+
+
 class AuthClient:
     def __init__(self, client: BaseClient) -> None:
         self._client = client
@@ -37,7 +40,8 @@ class AuthClient:
     ) -> SignInResponse:
         payload = await self._client._request_json(
             "POST",
-            "/api/auth/sessions?client_type=server",
+            "/api/auth/sessions",
+            params=SERVER_CLIENT_TYPE_PARAMS,
             json={"email": email, "password": password},
             exception_cls=InsforgeAuthError,
         )
@@ -126,7 +130,7 @@ class AuthClient:
         response = await self._client._request_json(
             "POST",
             "/api/auth/users",
-            params={"client_type": "server"},
+            params=SERVER_CLIENT_TYPE_PARAMS,
             json=payload,
             exception_cls=InsforgeAuthError,
         )
@@ -168,7 +172,7 @@ class AuthClient:
         payload = await self._client._request_json(
             "POST",
             "/api/auth/refresh",
-            params={"client_type": "server"},
+            params=SERVER_CLIENT_TYPE_PARAMS,
             json=RefreshRequest(refresh_token=refresh_token).model_dump(by_alias=True),
             exception_cls=InsforgeAuthError,
         )
