@@ -257,6 +257,7 @@ def test_auth_config_and_user_management_endpoints_request_expected_payloads() -
 
     assert calls[3]["method"] == "POST"
     assert calls[3]["url"] == "https://example.com/api/auth/users"
+    assert calls[3]["kwargs"]["params"] == {"client_type": "server"}
     assert calls[3]["kwargs"]["json"] == {
         "email": "b@example.com",
         "password": "secret123",

@@ -126,6 +126,7 @@ class AuthClient:
         response = await self._client._request_json(
             "POST",
             "/api/auth/users",
+            params={"client_type": "server"},
             json=payload,
             exception_cls=InsforgeAuthError,
         )
