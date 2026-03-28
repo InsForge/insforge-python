@@ -66,6 +66,44 @@ def test_database_query_builder_maps_common_read_operators_and_pagination() -> N
     assert result == []
 
 
+def test_database_query_builder_serializes_boolean_and_null_filter_values() -> None:
+    async def scenario() -> tuple[object, dict[str, object]]:
+        captured: dict[str, object] = {}
+
+        async def fake_request(method: str, url: httpx.URL, **kwargs: object) -> httpx.Response:
+            captured["method"] = method
+            captured["url"] = str(url)
+            captured["kwargs"] = kwargs
+            return httpx.Response(200, json=[])
+
+        async with InsforgeClient(
+            base_url="https://example.com",
+            api_key="ins_test",
+        ) as client:
+            client.http_client.request = fake_request  # type: ignore[method-assign]
+            result = await (
+                client.database.from_("posts")
+                .eq("published", True)
+                .neq("archived", False)
+                .eq("deleted_reason", None)
+                .in_("status", ["draft", "published"])
+                .execute()
+            )
+
+            return result, captured
+
+    result, captured = asyncio.run(scenario())
+
+    assert captured["kwargs"]["params"] == {
+        "published": "eq.true",
+        "archived": "neq.false",
+        "deleted_reason": "eq.null",
+        "status": "in.(draft,published)",
+    }
+    assert "Authorization" not in captured["kwargs"]["headers"]
+    assert result == []
+
+
 def test_database_query_is_null_does_not_expose_inverse_form() -> None:
     query = InsforgeClient(base_url="https://example.com", api_key="ins_test").database.from_("posts")
 
@@ -92,16 +130,10 @@ def test_database_query_insert_sends_array_body_and_prefer_return_representation
             api_key="ins_test",
         ) as client:
             client.http_client.request = fake_request  # type: ignore[method-assign]
-            result = await (
-                client.database.from_("posts")
-                .select("id,title")
-                .eq("status", "active")
-                .limit(5)
-                .insert(
-                    [{"title": "Hello", "published": True}],
-                    return_representation=True,
-                    access_token="user_token",
-                )
+            result = await client.database.from_("posts").insert(
+                [{"title": "Hello", "published": True}],
+                return_representation=True,
+                access_token="user_token",
             )
 
             return result, captured
@@ -153,6 +185,7 @@ def test_database_query_update_and_delete_use_prefer_and_handle_empty_delete_res
 
     assert update_captured["method"] == "PATCH"
     assert update_captured["url"] == "https://example.com/api/database/records/posts"
+    assert update_captured["kwargs"]["params"] == {"id": "eq.1"}
     assert update_captured["kwargs"]["json"] == {"title": "Updated"}
     assert update_captured["kwargs"]["headers"]["Authorization"] == "Bearer user_token"
     assert update_captured["kwargs"]["headers"]["X-API-Key"] == "ins_test"
@@ -161,6 +194,7 @@ def test_database_query_update_and_delete_use_prefer_and_handle_empty_delete_res
 
     assert delete_captured["method"] == "DELETE"
     assert delete_captured["url"] == "https://example.com/api/database/records/posts"
+    assert delete_captured["kwargs"]["params"] == {"id": "eq.1"}
     assert "json" not in delete_captured["kwargs"] or delete_captured["kwargs"]["json"] is None
     assert delete_captured["kwargs"]["headers"]["Authorization"] == "Bearer user_token"
     assert delete_captured["kwargs"]["headers"]["X-API-Key"] == "ins_test"

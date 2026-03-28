@@ -16,6 +16,14 @@ class DatabaseQuery:
     def _with_param(self, key: str, value: str) -> "DatabaseQuery":
         return replace(self, _params=self._params + ((key, value),))
 
+    @staticmethod
+    def _serialize_filter_value(value: object) -> str:
+        if value is None:
+            return "null"
+        if isinstance(value, bool):
+            return "true" if value else "false"
+        return str(value)
+
     def _build_params(self) -> dict[str, str]:
         return {key: value for key, value in self._params}
 
@@ -23,31 +31,31 @@ class DatabaseQuery:
         return self._with_param("select", columns)
 
     def eq(self, column: str, value: object) -> "DatabaseQuery":
-        return self._with_param(column, f"eq.{value}")
+        return self._with_param(column, f"eq.{self._serialize_filter_value(value)}")
 
     def neq(self, column: str, value: object) -> "DatabaseQuery":
-        return self._with_param(column, f"neq.{value}")
+        return self._with_param(column, f"neq.{self._serialize_filter_value(value)}")
 
     def gt(self, column: str, value: object) -> "DatabaseQuery":
-        return self._with_param(column, f"gt.{value}")
+        return self._with_param(column, f"gt.{self._serialize_filter_value(value)}")
 
     def gte(self, column: str, value: object) -> "DatabaseQuery":
-        return self._with_param(column, f"gte.{value}")
+        return self._with_param(column, f"gte.{self._serialize_filter_value(value)}")
 
     def lt(self, column: str, value: object) -> "DatabaseQuery":
-        return self._with_param(column, f"lt.{value}")
+        return self._with_param(column, f"lt.{self._serialize_filter_value(value)}")
 
     def lte(self, column: str, value: object) -> "DatabaseQuery":
-        return self._with_param(column, f"lte.{value}")
+        return self._with_param(column, f"lte.{self._serialize_filter_value(value)}")
 
     def like(self, column: str, value: object) -> "DatabaseQuery":
-        return self._with_param(column, f"like.{value}")
+        return self._with_param(column, f"like.{self._serialize_filter_value(value)}")
 
     def ilike(self, column: str, value: object) -> "DatabaseQuery":
-        return self._with_param(column, f"ilike.{value}")
+        return self._with_param(column, f"ilike.{self._serialize_filter_value(value)}")
 
     def in_(self, column: str, values: Sequence[object]) -> "DatabaseQuery":
-        joined_values = ",".join(str(value) for value in values)
+        joined_values = ",".join(self._serialize_filter_value(value) for value in values)
         return self._with_param(column, f"in.({joined_values})")
 
     def is_null(self, column: str) -> "DatabaseQuery":
