@@ -14,7 +14,7 @@ dependencies = [
 ]
 
 [tool.setuptools]
-packages = ["insforge", "insforge.auth", "insforge.database"]
+packages = ["insforge", "insforge.auth", "insforge.database", "insforge.storage"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
