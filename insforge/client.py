@@ -3,6 +3,7 @@ from __future__ import annotations
 from ._base_client import BaseClient
 from .auth.client import AuthClient
 from .database.client import DatabaseClient
+from .functions.client import FunctionsClient
 from .storage.client import StorageClient
 
 
@@ -11,4 +12,5 @@ class InsforgeClient(BaseClient):
         super().__init__(base_url=base_url, api_key=api_key)
         self.auth = AuthClient(self)
         self.database = DatabaseClient(self)
+        self.functions = FunctionsClient(self)
         self.storage = StorageClient(self)
