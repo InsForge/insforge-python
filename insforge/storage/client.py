@@ -6,8 +6,12 @@ from typing import Iterable
 
 import httpx
 
+import logging
+
 from .._base_client import BaseClient
 from ..exceptions import InsforgeHTTPError
+
+logger = logging.getLogger("insforge")
 from .._utils import quote_path_segment
 from .models import DownloadStrategy
 from .models import StorageBucketListResponse
@@ -130,15 +134,20 @@ class StorageClient:
         extra_headers: Mapping[str, str] | None = None,
     ) -> StorageObjectResponse:
         path = self._object_url_path(bucket_name, object_key)
+        url = self._client._build_url(path)
+        logger.debug(">>> PUT %s file=%s size=%d", url, object_key, len(data))
+
         response = await self._client.http_client.request(
             "PUT",
-            self._client._build_url(path),
+            url,
             files={"file": (object_key, data, content_type or "application/octet-stream")},
             headers=self._client._build_headers(
                 access_token=access_token,
                 extra_headers=extra_headers,
             ),
         )
+
+        logger.debug("<<< PUT %s status=%d", url, response.status_code)
 
         if response.is_error:
             raise InsforgeHTTPError.from_response(
@@ -158,14 +167,19 @@ class StorageClient:
         extra_headers: Mapping[str, str] | None = None,
     ) -> StorageDownloadResult:
         path = self._object_url_path(bucket_name, object_key)
+        url = self._client._build_url(path)
+        logger.debug(">>> GET %s", url)
+
         response = await self._client.http_client.request(
             "GET",
-            self._client._build_url(path),
+            url,
             headers=self._client._build_headers(
                 access_token=access_token,
                 extra_headers=extra_headers,
             ),
         )
+
+        logger.debug("<<< GET %s status=%d", url, response.status_code)
 
         if response.is_error:
             raise InsforgeHTTPError.from_response(
@@ -214,12 +228,17 @@ class StorageClient:
         access_token: str | None = None,
     ) -> StorageObjectResponse:
         path = f"/api/storage/buckets/{quote_path_segment(bucket_name)}/objects"
+        url = self._client._build_url(path)
+        logger.debug(">>> POST %s file=%s size=%d", url, filename, len(data))
+
         response = await self._client.http_client.request(
             "POST",
-            self._client._build_url(path),
+            url,
             files={"file": (filename, data, content_type or "application/octet-stream")},
             headers=self._client._build_headers(access_token=access_token),
         )
+
+        logger.debug("<<< POST %s status=%d", url, response.status_code)
 
         if response.is_error:
             raise InsforgeHTTPError.from_response("POST", path, response)

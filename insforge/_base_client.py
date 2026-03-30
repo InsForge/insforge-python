@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 from typing import Mapping
 from urllib.parse import urlsplit
@@ -8,6 +9,9 @@ import httpx
 
 from .exceptions import InsforgeHTTPError
 from ._utils import normalize_base_url
+from ._version import VERSION, USER_AGENT
+
+logger = logging.getLogger("insforge")
 
 
 def build_headers(
@@ -15,8 +19,8 @@ def build_headers(
     access_token: str | None = None,
     extra_headers: Mapping[str, str] | None = None,
 ) -> dict[str, str]:
-    headers: dict[str, str] = {"X-API-Key": api_key}
-    reserved_headers = {"authorization", "x-api-key"}
+    headers: dict[str, str] = {"X-API-Key": api_key, "User-Agent": USER_AGENT}
+    reserved_headers = {"authorization", "x-api-key", "user-agent"}
 
     if access_token:
         headers["Authorization"] = f"Bearer {access_token}"
@@ -33,6 +37,7 @@ class BaseClient:
         self.base_url = normalize_base_url(base_url)
         self.api_key = api_key
         self.http_client = httpx.AsyncClient()
+        logger.info("InsforgeClient initialized (version=%s, base_url=%s)", VERSION, self.base_url)
 
     def _build_headers(
         self,
@@ -125,9 +130,12 @@ class BaseClient:
         extra_headers: Mapping[str, str] | None = None,
         exception_cls: type[InsforgeHTTPError] = InsforgeHTTPError,
     ) -> httpx.Response:
+        url = self._build_url(path)
+        logger.debug(">>> %s %s params=%s body=%s", method, url, params, json)
+
         response = await self.http_client.request(
             method,
-            self._build_url(path),
+            url,
             params=params,
             json=json,
             headers=self._build_headers(
@@ -135,6 +143,8 @@ class BaseClient:
                 extra_headers=extra_headers,
             ),
         )
+
+        logger.debug("<<< %s %s status=%d", method, url, response.status_code)
 
         if response.is_error:
             raise exception_cls.from_response(method, path, response)

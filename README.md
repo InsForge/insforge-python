@@ -196,6 +196,28 @@ Exception hierarchy:
   - `InsforgeValidationError` - Pydantic validation failures
   - `InsforgeSerializationError` - serialization failures
 
+## Logging
+
+The SDK uses Python's built-in `logging` module under the `insforge` logger. By default no logs are emitted. Call `setup_logging` to enable output:
+
+```python
+import insforge
+
+# INFO — SDK initialization details and important operation results
+insforge.setup_logging("INFO")
+
+# DEBUG — full HTTP request/response (method, URL, params, status code)
+insforge.setup_logging("DEBUG")
+```
+
+You can also configure the `insforge` logger directly with the standard `logging` module for more advanced setups:
+
+```python
+import logging
+
+logging.getLogger("insforge").setLevel(logging.DEBUG)
+```
+
 ## Authentication Model
 
 The SDK is **stateless** - it never stores or caches tokens. Every method that requires user auth takes an explicit `access_token` parameter. The API key is sent as `X-API-Key` on every request automatically.
