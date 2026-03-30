@@ -13,6 +13,37 @@ from ._version import VERSION, USER_AGENT
 
 logger = logging.getLogger("insforge")
 
+_SENSITIVE_KEYS = frozenset({
+    "password",
+    "new_password",
+    "newPassword",
+    "token",
+    "otp",
+    "code",
+    "access_token",
+    "accessToken",
+    "refresh_token",
+    "refreshToken",
+    "api_key",
+    "apiKey",
+})
+
+_REDACTED = "***"
+
+
+def _sanitize_body(body: Any) -> Any:
+    """Return a copy of *body* with sensitive values replaced by ``'***'``."""
+    if body is None:
+        return None
+    if isinstance(body, dict):
+        return {
+            k: _REDACTED if k in _SENSITIVE_KEYS else _sanitize_body(v)
+            for k, v in body.items()
+        }
+    if isinstance(body, list):
+        return [_sanitize_body(item) for item in body]
+    return body
+
 
 def build_headers(
     api_key: str,
@@ -131,7 +162,7 @@ class BaseClient:
         exception_cls: type[InsforgeHTTPError] = InsforgeHTTPError,
     ) -> httpx.Response:
         url = self._build_url(path)
-        logger.debug(">>> %s %s params=%s body=%s", method, url, params, json)
+        logger.debug(">>> %s %s params=%s body=%s", method, url, params, _sanitize_body(json))
 
         response = await self.http_client.request(
             method,
