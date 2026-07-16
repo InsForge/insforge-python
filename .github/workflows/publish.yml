@@ -16,6 +16,8 @@ jobs:
   build:
     name: Build distributions
     runs-on: ubuntu-latest
+    outputs:
+      stable: ${{ steps.version.outputs.stable }}
     steps:
       - uses: actions/checkout@v7
 
@@ -24,6 +26,7 @@ jobs:
           python-version: "3.11"
 
       - name: Validate tag matches package version
+        id: version
         env:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
@@ -31,6 +34,12 @@ jobs:
           if [ "$RELEASE_TAG" != "v$package_version" ]; then
             echo "Tag $RELEASE_TAG does not match package version $package_version."
             exit 1
+          fi
+
+          if [[ "$package_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "stable=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "stable=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Install test and build tools
@@ -77,3 +86,24 @@ jobs:
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@v1.14.0
+
+  release:
+    name: Create stable GitHub Release
+    if: needs.build.outputs.stable == 'true'
+    needs: [build, publish]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          if gh release view "$RELEASE_TAG" --repo "$REPOSITORY" >/dev/null 2>&1; then
+            echo "GitHub Release $RELEASE_TAG already exists"
+          else
+            gh release create "$RELEASE_TAG" --repo "$REPOSITORY" --generate-notes --verify-tag
+          fi

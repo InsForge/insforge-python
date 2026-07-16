@@ -269,7 +269,7 @@ git tag -a vX.Y.Z -m "vX.Y.Z"
 git push origin vX.Y.Z
 ```
 
-The tag triggers a build, metadata validation, and publication to PyPI. PEP 440 prerelease versions are supported as long as the tag exactly matches the version in `pyproject.toml`.
+The tag triggers a build, metadata validation, and publication to PyPI. PEP 440 prerelease versions are supported as long as the tag exactly matches the version in `pyproject.toml`. After PyPI publication succeeds, stable `X.Y.Z` versions create a GitHub Release automatically; prerelease tags do not.
 
 ## License
 
