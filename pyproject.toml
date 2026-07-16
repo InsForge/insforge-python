@@ -13,6 +13,10 @@ dependencies = [
     "pydantic>=2.0",
 ]
 
+[project.urls]
+Source = "https://github.com/InsForge/insforge-python"
+Issues = "https://github.com/InsForge/insforge-python/issues"
+
 [tool.setuptools]
 packages = [
     "insforge",

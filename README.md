@@ -257,17 +257,19 @@ python -m build
 
 This produces `dist/insforge-<version>.tar.gz` and `dist/insforge-<version>-py3-none-any.whl`.
 
-### Publish to PyPI
+### Release to PyPI
+
+Publishing uses PyPI Trusted Publishing through `.github/workflows/publish.yml`; no PyPI API token is stored in GitHub. The workflow publishes both the wheel and source distribution and produces digital attestations.
+
+1. Update `project.version` in `pyproject.toml` and merge the change to `main` after CI passes.
+2. Create and push an annotated tag that exactly matches the package version with a `v` prefix:
 
 ```bash
-pip install twine
-
-# Test PyPI (recommended first)
-twine upload --repository testpypi dist/*
-
-# Production PyPI
-twine upload dist/*
+git tag -a vX.Y.Z -m "vX.Y.Z"
+git push origin vX.Y.Z
 ```
+
+The tag triggers a build, metadata validation, and publication to PyPI. PEP 440 prerelease versions are supported as long as the tag exactly matches the version in `pyproject.toml`. After PyPI publication succeeds, stable `X.Y.Z` versions create a GitHub Release automatically; prerelease tags do not.
 
 ## License
 
