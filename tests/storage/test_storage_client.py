@@ -1,4 +1,5 @@
 import asyncio
+import re
 from pathlib import Path
 import tomllib
 
@@ -332,16 +333,16 @@ def test_upload_auto_and_strategy_endpoints() -> None:
 
         async def fake_request(method: str, url: httpx.URL, **kwargs: object) -> httpx.Response:
             calls.append({"method": method, "url": str(url), "kwargs": kwargs})
-            if url.path.endswith("/objects"):
+            if method == "PUT":
                 return httpx.Response(
                     201,
                     json={
                         "bucket": "avatars",
-                        "key": "auto.jpg",
+                        "key": url.path.rsplit("/objects/", 1)[-1],
                         "size": 10,
                         "mimeType": "image/jpeg",
                         "uploadedAt": "2024-01-01T00:00:00Z",
-                        "url": "/api/storage/buckets/avatars/objects/auto.jpg",
+                        "url": str(url.path),
                     },
                 )
             if url.path.endswith("/confirm-upload"):
@@ -383,8 +384,11 @@ def test_upload_auto_and_strategy_endpoints() -> None:
 
     calls, auto, confirm, upload_strategy, download_strategy = asyncio.run(scenario())
 
-    assert calls[0]["method"] == "POST" and calls[0]["url"].endswith("/objects")
-    assert auto.key == "auto.jpg"
+    # upload_object_auto mints a unique key client-side and uploads via the
+    # standard PUT route — the backend no longer generates keys.
+    assert calls[0]["method"] == "PUT"
+    assert re.search(r"/objects/auto-\d+-[a-z0-9]{6}\.jpg$", calls[0]["url"])
+    assert re.fullmatch(r"auto-\d+-[a-z0-9]{6}\.jpg", auto.key)
 
     assert calls[1]["method"] == "POST" and calls[1]["url"].endswith("/confirm-upload")
     assert calls[1]["kwargs"]["json"] == {"size": 10, "etag": "etag123"}
@@ -401,6 +405,96 @@ def test_upload_auto_and_strategy_endpoints() -> None:
     assert calls[3]["method"] == "POST" and calls[3]["url"].endswith("/download-strategy")
     assert calls[3]["kwargs"]["json"] == {"expiresIn": 3600}
     assert download_strategy.method == "direct"
+
+
+def test_upload_object_auto_mints_key_client_side_and_uses_put() -> None:
+    async def scenario() -> tuple[object, dict[str, object]]:
+        captured: dict[str, object] = {}
+
+        async def fake_request(method: str, url: httpx.URL, **kwargs: object) -> httpx.Response:
+            captured["method"] = method
+            captured["url"] = str(url)
+            captured["kwargs"] = kwargs
+            key = url.path.rsplit("/objects/", 1)[-1]
+            return httpx.Response(
+                201,
+                json={
+                    "bucket": "docs",
+                    "key": key,
+                    "size": 3,
+                    "mimeType": "application/pdf",
+                    "uploadedAt": "2026-01-01T00:00:00Z",
+                    "url": str(url.path),
+                },
+            )
+
+        async with InsforgeClient(
+            base_url="https://example.com",
+            api_key="ins_test",
+        ) as client:
+            client.http_client.request = fake_request  # type: ignore[method-assign]
+            result = await client.storage.upload_object_auto(
+                "docs",
+                data=b"pdf",
+                filename="report.pdf",
+                content_type="application/pdf",
+            )
+            return result, captured
+
+    result, captured = asyncio.run(scenario())
+
+    # Client-generated key: sanitized base + timestamp + random, preserving ext.
+    assert captured["method"] == "PUT"
+    assert re.fullmatch(r"report-\d+-[a-z0-9]{6}\.pdf", result.key)
+    assert captured["url"].endswith(f"/api/storage/buckets/docs/objects/{result.key}")
+    assert captured["kwargs"]["files"]["file"] == (result.key, b"pdf", "application/pdf")
+
+
+def test_upload_object_auto_generates_distinct_keys_for_same_filename() -> None:
+    async def scenario() -> list[str]:
+        keys: list[str] = []
+
+        async def fake_request(method: str, url: httpx.URL, **kwargs: object) -> httpx.Response:
+            key = url.path.rsplit("/objects/", 1)[-1]
+            keys.append(key)
+            return httpx.Response(
+                201,
+                json={
+                    "bucket": "docs",
+                    "key": key,
+                    "size": 3,
+                    "mimeType": "application/octet-stream",
+                    "uploadedAt": "2026-01-01T00:00:00Z",
+                    "url": str(url.path),
+                },
+            )
+
+        async with InsforgeClient(base_url="https://example.com", api_key="ins_test") as client:
+            client.http_client.request = fake_request  # type: ignore[method-assign]
+            await client.storage.upload_object_auto("docs", data=b"abc", filename="photo.png")
+            await client.storage.upload_object_auto("docs", data=b"abc", filename="photo.png")
+            return keys
+
+    keys = asyncio.run(scenario())
+
+    assert len(keys) == 2
+    assert keys[0] != keys[1]
+
+
+def test_generate_object_key_sanitizes_base_and_falls_back_to_file() -> None:
+    from insforge.storage.client import _generate_object_key
+
+    # Non-alphanumeric characters in the base are replaced, extension kept.
+    assert re.fullmatch(r"my-r-sum--v2-\d+-[a-z0-9]{6}\.pdf", _generate_object_key("my résumé v2.pdf"))
+    # Base longer than 32 chars is truncated.
+    key = _generate_object_key("a" * 50 + ".txt")
+    assert re.fullmatch(r"a{32}-\d+-[a-z0-9]{6}\.txt", key)
+    # Disallowed characters are each replaced with a dash.
+    assert re.fullmatch(r"----\d+-[a-z0-9]{6}", _generate_object_key("日本語"))
+    # An empty base falls back to "file".
+    assert re.fullmatch(r"file-\d+-[a-z0-9]{6}", _generate_object_key(""))
+    # A leading dot is not treated as an extension separator.
+    assert re.fullmatch(r"-gitignore-\d+-[a-z0-9]{6}", _generate_object_key(".gitignore"))
 
 
 def test_storage_encoding_for_new_admin_paths() -> None:

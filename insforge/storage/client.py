@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import random
+import re
+import string
+import time
 from collections.abc import Mapping
 from typing import Any
 from typing import Iterable
@@ -23,6 +27,23 @@ from .models import StorageDownloadResult
 from .models import StorageObjectResponse
 from .models import StoredFileList
 from .models import UploadStrategy
+
+
+def _generate_object_key(filename: str) -> str:
+    """Generate a unique object key: ``<sanitized-base>-<timestamp>-<random><ext>``.
+
+    Auto-key generation is a client-side convenience — the storage API has no
+    server-side key minting — so ``upload_object_auto`` produces the key here
+    and then uploads through the standard ``upload_object`` path.
+    """
+    dot_index = filename.rfind(".")
+    has_ext = dot_index > 0
+    ext = filename[dot_index:] if has_ext else ""
+    base = filename[:dot_index] if has_ext else filename
+    sanitized_base = re.sub(r"[^a-zA-Z0-9-_]", "-", base)[:32] or "file"
+    timestamp = int(time.time() * 1000)
+    random_suffix = "".join(random.choices(string.digits + string.ascii_lowercase, k=6))
+    return f"{sanitized_base}-{timestamp}-{random_suffix}{ext}"
 
 
 class StorageClient:
@@ -133,6 +154,11 @@ class StorageClient:
         access_token: str | None = None,
         extra_headers: Mapping[str, str] | None = None,
     ) -> StorageObjectResponse:
+        """Upload a file to a specific key.
+
+        Standard PUT semantics: uploading to an existing key replaces the
+        current object in place.
+        """
         path = self._object_url_path(bucket_name, object_key)
         url = self._client._build_url(path)
         logger.debug(">>> PUT %s file=%s size=%d", url, object_key, len(data))
@@ -227,23 +253,20 @@ class StorageClient:
         content_type: str | None = None,
         access_token: str | None = None,
     ) -> StorageObjectResponse:
-        path = f"/api/storage/buckets/{quote_path_segment(bucket_name)}/objects"
-        url = self._client._build_url(path)
-        logger.debug(">>> POST %s file=%s size=%d", url, filename, len(data))
+        """Upload a file under an automatically generated, collision-free key.
 
-        response = await self._client.http_client.request(
-            "POST",
-            url,
-            files={"file": (filename, data, content_type or "application/octet-stream")},
-            headers=self._client._build_headers(access_token=access_token),
+        The key is derived client-side from the filename (sanitized base +
+        timestamp + random suffix) and uploaded through the standard
+        ``upload_object`` path, so repeated uploads of the same file never
+        overwrite each other.
+        """
+        return await self.upload_object(
+            bucket_name,
+            _generate_object_key(filename),
+            data,
+            content_type=content_type,
+            access_token=access_token,
         )
-
-        logger.debug("<<< POST %s status=%d", url, response.status_code)
-
-        if response.is_error:
-            raise InsforgeHTTPError.from_response("POST", path, response)
-
-        return StorageObjectResponse.model_validate(response.json())
 
     async def confirm_upload(
         self,
