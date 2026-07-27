@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from dataclasses import dataclass
 from typing import Any
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -43,6 +44,20 @@ class StorageDeleteObjectResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     message: str
+
+
+class StorageDeleteObjectResult(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    key: str
+    status: Literal["deleted", "notFound", "failed"]
+    message: str | None = None
+
+
+class StorageDeleteObjectsResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    results: list[StorageDeleteObjectResult] = Field(default_factory=list)
 
 
 class StoragePagination(BaseModel):

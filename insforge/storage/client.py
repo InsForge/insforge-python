@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from collections.abc import Sequence
 from typing import Any
 from typing import Iterable
 
@@ -19,6 +20,7 @@ from .models import StorageBucketResponse
 from .models import StorageBucketUpdateResponse
 from .models import StorageDeleteBucketResponse
 from .models import StorageDeleteObjectResponse
+from .models import StorageDeleteObjectsResponse
 from .models import StorageDownloadResult
 from .models import StorageObjectResponse
 from .models import StoredFileList
@@ -217,6 +219,28 @@ class StorageClient:
             extra_headers=extra_headers,
         )
         return StorageDeleteObjectResponse.model_validate(payload)
+
+    async def delete_objects(
+        self,
+        bucket_name: str,
+        object_keys: Sequence[str],
+        *,
+        access_token: str | None = None,
+        extra_headers: Mapping[str, str] | None = None,
+    ) -> StorageDeleteObjectsResponse:
+        """Delete multiple objects in a single request.
+
+        The batch endpoint accepts at most 1000 keys and returns one result
+        per key (``deleted``, ``notFound``, or ``failed``).
+        """
+        payload = await self._client._request_json(
+            "DELETE",
+            f"/api/storage/buckets/{quote_path_segment(bucket_name)}/objects",
+            json={"keys": list(object_keys)},
+            access_token=access_token,
+            extra_headers=extra_headers,
+        )
+        return StorageDeleteObjectsResponse.model_validate(payload)
 
     async def upload_object_auto(
         self,

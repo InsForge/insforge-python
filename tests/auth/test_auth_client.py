@@ -6,7 +6,9 @@ from pydantic import ValidationError
 
 from insforge import InsforgeClient
 from insforge.auth.models import AuthConfigUpdateRequest
+from insforge.auth.models import AuthSendOtpRequest
 from insforge.auth.models import AuthUserCreateRequest
+from insforge.auth.models import AuthVerifyOtpRequest
 from insforge.exceptions import InsforgeAuthError
 
 
@@ -585,6 +587,145 @@ def test_auth_email_json_endpoints_omit_optional_redirect_and_raise_auth_errors(
     assert captured_send["kwargs"]["json"] == {"email": "a@example.com"}
     assert "Authorization" not in captured_send["kwargs"]["headers"]
     assert captured_verify["kwargs"]["params"] == {"client_type": "server"}
+
+
+def test_sign_in_with_otp_posts_email_and_returns_generic_payload() -> None:
+    async def scenario() -> tuple[object, dict[str, object]]:
+        captured: dict[str, object] = {}
+
+        async def fake_request(method: str, url: httpx.URL, **kwargs: object) -> httpx.Response:
+            captured["method"] = method
+            captured["url"] = str(url)
+            captured["kwargs"] = kwargs
+            return httpx.Response(
+                202,
+                json={
+                    "success": True,
+                    "message": "If sign-in is available for this email, we have sent a verification code.",
+                },
+            )
+
+        async with InsforgeClient(
+            base_url="https://example.com",
+            api_key="ins_test",
+        ) as client:
+            client.http_client.request = fake_request  # type: ignore[method-assign]
+            result = await client.auth.sign_in_with_otp(email="user@example.com")
+
+            return result, captured
+
+    result, captured = asyncio.run(scenario())
+
+    assert captured["method"] == "POST"
+    assert captured["url"] == "https://example.com/api/auth/email/send-otp"
+    assert captured["kwargs"]["json"] == {"email": "user@example.com"}
+    assert captured["kwargs"]["headers"]["X-API-Key"] == "ins_test"
+    assert "Authorization" not in captured["kwargs"]["headers"]
+    assert result.success is True
+    assert result.message == "If sign-in is available for this email, we have sent a verification code."
+
+
+def test_verify_otp_posts_method_otp_to_sessions_and_returns_session() -> None:
+    async def scenario() -> tuple[object, dict[str, object]]:
+        captured: dict[str, object] = {}
+
+        async def fake_request(method: str, url: httpx.URL, **kwargs: object) -> httpx.Response:
+            captured["method"] = method
+            captured["url"] = str(url)
+            captured["kwargs"] = kwargs
+            return httpx.Response(
+                200,
+                json={
+                    "user": {
+                        "id": "u1",
+                        "email": "user@example.com",
+                        "emailVerified": True,
+                    },
+                    "accessToken": "access",
+                    "refreshToken": "refresh",
+                },
+            )
+
+        async with InsforgeClient(
+            base_url="https://example.com",
+            api_key="ins_test",
+        ) as client:
+            client.http_client.request = fake_request  # type: ignore[method-assign]
+            result = await client.auth.verify_otp(
+                email="user@example.com",
+                otp="123456",
+                name="Ada Lovelace",
+            )
+
+            return result, captured
+
+    result, captured = asyncio.run(scenario())
+
+    assert captured["method"] == "POST"
+    assert captured["url"] == "https://example.com/api/auth/sessions"
+    assert captured["kwargs"]["params"] == {"client_type": "server"}
+    assert captured["kwargs"]["json"] == {
+        "email": "user@example.com",
+        "otp": "123456",
+        "name": "Ada Lovelace",
+        "method": "otp",
+    }
+    assert captured["kwargs"]["headers"]["X-API-Key"] == "ins_test"
+    assert "Authorization" not in captured["kwargs"]["headers"]
+    assert result.user.email == "user@example.com"
+    assert result.access_token == "access"
+    assert result.refresh_token == "refresh"
+
+
+def test_verify_otp_omits_optional_name_and_raises_auth_error() -> None:
+    async def scenario() -> tuple[dict[str, object], dict[str, object]]:
+        captured_ok: dict[str, object] = {}
+        captured_fail: dict[str, object] = {}
+
+        async def fake_request(method: str, url: httpx.URL, **kwargs: object) -> httpx.Response:
+            if not captured_ok:
+                captured_ok["method"] = method
+                captured_ok["url"] = str(url)
+                captured_ok["kwargs"] = kwargs
+                return httpx.Response(200, json={"accessToken": "access", "refreshToken": "refresh"})
+
+            captured_fail["method"] = method
+            captured_fail["url"] = str(url)
+            captured_fail["kwargs"] = kwargs
+            return httpx.Response(401, json={"error": "INVALID_OTP", "message": "Verification code expired"})
+
+        async with InsforgeClient(
+            base_url="https://example.com",
+            api_key="ins_test",
+        ) as client:
+            client.http_client.request = fake_request  # type: ignore[method-assign]
+            await client.auth.verify_otp(email="user@example.com", otp="123456")
+
+            try:
+                await client.auth.verify_otp(email="user@example.com", otp="000000")
+            except InsforgeAuthError as exc:
+                assert exc.error == "INVALID_OTP"
+                assert exc.message == "Verification code expired"
+            else:
+                raise AssertionError("verify_otp should raise InsforgeAuthError on 401")
+
+            return captured_ok, captured_fail
+
+    captured_ok, captured_fail = asyncio.run(scenario())
+
+    assert captured_ok["kwargs"]["json"] == {
+        "email": "user@example.com",
+        "otp": "123456",
+        "method": "otp",
+    }
+    assert captured_fail["kwargs"]["params"] == {"client_type": "server"}
+
+
+def test_send_otp_and_verify_otp_reject_empty_fields() -> None:
+    with pytest.raises(ValidationError):
+        AuthSendOtpRequest(email="")
+    with pytest.raises(ValidationError):
+        AuthVerifyOtpRequest(email="user@example.com", otp="")
 
 
 def test_create_user_rejects_empty_email_and_password() -> None:

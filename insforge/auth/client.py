@@ -16,8 +16,10 @@ from .models import AuthConfigUpdateRequest
 from .models import AuthCurrentSessionResponse
 from .models import AuthDeleteUsersRequest
 from .models import AuthDeleteUsersResponse
+from .models import AuthSendOtpRequest
 from .models import AuthSessionResponse
 from .models import AuthUserCreateRequest
+from .models import AuthVerifyOtpRequest
 from .models import AuthResetPasswordExchangeRequest
 from .models import AuthResetPasswordExchangeResponse
 from .models import AuthResetPasswordRequest
@@ -52,6 +54,53 @@ class AuthClient:
             exception_cls=InsforgeAuthError,
         )
         return SignInResponse.model_validate(payload)
+
+    async def sign_in_with_otp(
+        self,
+        *,
+        email: str,
+    ) -> AuthEmailActionResponse:
+        """Send a one-time sign-in code to an email address.
+
+        The response is intentionally generic whether or not an account
+        exists, to avoid account enumeration. Complete the flow with
+        ``verify_otp``.
+        """
+        payload = AuthSendOtpRequest(email=email).model_dump(by_alias=True)
+        response = await self._client._request_json(
+            "POST",
+            "/api/auth/email/send-otp",
+            json=payload,
+            exception_cls=InsforgeAuthError,
+        )
+        return AuthEmailActionResponse.model_validate(response)
+
+    async def verify_otp(
+        self,
+        *,
+        email: str,
+        otp: str,
+        name: str | None = None,
+    ) -> AuthSessionResponse:
+        """Verify an email sign-in code and create a session.
+
+        If the email is new, a verified passwordless user is created; ``name``
+        sets the display name only on that first-time creation.
+        """
+        payload = AuthVerifyOtpRequest(email=email, otp=otp, name=name).model_dump(
+            by_alias=True,
+            exclude_none=True,
+        )
+        # method is set last so it can never be clobbered by the payload.
+        payload["method"] = "otp"
+        response = await self._client._request_json(
+            "POST",
+            "/api/auth/sessions",
+            params=SERVER_CLIENT_TYPE_PARAMS,
+            json=payload,
+            exception_cls=InsforgeAuthError,
+        )
+        return AuthSessionResponse.model_validate(response)
 
     async def send_email_verification(
         self,

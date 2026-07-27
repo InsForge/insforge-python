@@ -35,6 +35,20 @@ class AuthEmailVerifyRequest(BaseModel):
     otp: str = Field(min_length=1)
 
 
+class AuthSendOtpRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    email: str = Field(min_length=1)
+
+
+class AuthVerifyOtpRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    email: str = Field(min_length=1)
+    otp: str = Field(min_length=1)
+    name: str | None = None
+
+
 class AuthResetPasswordExchangeRequest(BaseModel):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
