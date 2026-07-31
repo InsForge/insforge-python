@@ -51,6 +51,10 @@ user = await client.auth.create_user(email="...", password="...")
 await client.auth.send_email_verification(email="...")
 await client.auth.verify_email(email="...", otp="123456")
 
+# Passwordless email OTP sign-in
+await client.auth.sign_in_with_otp(email="...")
+session = await client.auth.verify_otp(email="...", otp="123456")
+
 # Password reset
 await client.auth.send_reset_password_email(email="...")
 resp = await client.auth.exchange_reset_password_token(email="...", code="123456")
@@ -110,6 +114,10 @@ await client.storage.upload_object("my-bucket", "photos/cat.jpg", image_bytes, c
 data = await client.storage.download_object("my-bucket", "photos/cat.jpg")
 
 await client.storage.delete_object("my-bucket", "photos/cat.jpg")
+
+# Delete multiple objects in one request (maximum 1000 keys)
+response = await client.storage.delete_objects("my-bucket", ["photos/cat.jpg", "photos/dog.jpg"])
+# response.results: one entry per key with status "deleted" | "notFound" | "failed"
 ```
 
 ### Functions

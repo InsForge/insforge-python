@@ -245,6 +245,86 @@ def test_delete_object_uses_delete_and_returns_success_payload() -> None:
     assert result.message == "Object deleted successfully"
 
 
+def test_delete_objects_uses_batch_endpoint_and_returns_per_key_results() -> None:
+    async def scenario() -> tuple[object, dict[str, object]]:
+        captured: dict[str, object] = {}
+
+        async def fake_request(method: str, url: httpx.URL, **kwargs: object) -> httpx.Response:
+            captured["method"] = method
+            captured["url"] = str(url)
+            captured["kwargs"] = kwargs
+            return httpx.Response(
+                200,
+                json={
+                    "results": [
+                        {"key": "a.pdf", "status": "deleted"},
+                        {"key": "missing.pdf", "status": "notFound"},
+                        {"key": "locked.pdf", "status": "failed", "message": "Delete denied"},
+                    ],
+                },
+            )
+
+        async with InsforgeClient(
+            base_url="https://example.com",
+            api_key="ins_test",
+        ) as client:
+            client.http_client.request = fake_request  # type: ignore[method-assign]
+            result = await client.storage.delete_objects(
+                "docs",
+                ["a.pdf", "missing.pdf", "locked.pdf"],
+            )
+
+            return result, captured
+
+    result, captured = asyncio.run(scenario())
+
+    assert captured["method"] == "DELETE"
+    assert captured["url"] == "https://example.com/api/storage/buckets/docs/objects"
+    assert captured["kwargs"]["json"] == {"keys": ["a.pdf", "missing.pdf", "locked.pdf"]}
+    assert captured["kwargs"]["headers"]["X-API-Key"] == "ins_test"
+    assert [(entry.key, entry.status) for entry in result.results] == [
+        ("a.pdf", "deleted"),
+        ("missing.pdf", "notFound"),
+        ("locked.pdf", "failed"),
+    ]
+    assert result.results[2].message == "Delete denied"
+
+
+def test_delete_objects_does_not_split_oversized_batches_and_raises_http_error() -> None:
+    captured: dict[str, object] = {}
+    call_count = 0
+
+    async def scenario() -> None:
+        async def fake_request(method: str, url: httpx.URL, **kwargs: object) -> httpx.Response:
+            nonlocal call_count
+            call_count += 1
+            captured["kwargs"] = kwargs
+            return httpx.Response(
+                400,
+                json={
+                    "error": "STORAGE_ERROR",
+                    "message": "Cannot delete more than 1000 objects at once",
+                },
+            )
+
+        async with InsforgeClient(
+            base_url="https://example.com",
+            api_key="ins_test",
+        ) as client:
+            client.http_client.request = fake_request  # type: ignore[method-assign]
+            await client.storage.delete_objects(
+                "docs",
+                [f"file-{index}.txt" for index in range(1001)],
+            )
+
+    with pytest.raises(InsforgeHTTPError) as exc_info:
+        asyncio.run(scenario())
+
+    assert exc_info.value.status_code == 400
+    assert call_count == 1
+    assert len(captured["kwargs"]["json"]["keys"]) == 1001
+
+
 def test_upload_object_raises_insforge_http_error_on_failure() -> None:
     async def scenario() -> None:
         async def fake_request(method: str, url: httpx.URL, **kwargs: object) -> httpx.Response:
